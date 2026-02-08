@@ -1,17 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <PackageId>WebLookup</PackageId>
-    <Version>0.1.0</Version>
-    <Authors>iyulab</Authors>
     <Description>A lightweight .NET library for fast URL discovery across multiple search providers with built-in rate limiting, automatic fallback, and site exploration.</Description>
-    <PackageTags>search;web;url;mojeek;searchapi;tavily;sitemap;robots</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>search;web;url;google;mojeek;searchapi;tavily;sitemap;robots</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <RepositoryUrl>https://github.com/iyulab/WebLookup</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0-preview.*" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>

@@ -6,7 +6,7 @@ A lightweight .NET library for fast URL discovery across multiple search provide
 
 ## Features
 
-- **Multi-provider search** — Mojeek, SearchApi, Tavily
+- **Multi-provider search** — Google, Mojeek, SearchApi, Tavily
 - **Parallel execution** — All configured providers queried simultaneously
 - **Smart fallback** — Continues serving results from healthy providers when one fails or hits rate limits
 - **URL deduplication** — Merges results across providers, removes duplicates
@@ -29,6 +29,7 @@ dotnet add package WebLookup
 using WebLookup;
 
 var client = new WebSearchClient(
+    new GoogleSearchProvider(new() { Engines = [new() { ApiKey = "...", Cx = "..." }] }),
     new MojeekSearchProvider(new() { ApiKey = "..." }),
     new SearchApiProvider(new() { ApiKey = "..." }),
     new TavilySearchProvider(new() { ApiKey = "..." })
@@ -49,6 +50,17 @@ Results are deduplicated by URL. Providers run in parallel. If one provider hits
 ### Use a single provider
 
 ```csharp
+// Google Custom Search
+var google = new GoogleSearchProvider(new()
+{
+    Engines = [new() { ApiKey = "YOUR_API_KEY", Cx = "YOUR_CX" }]
+});
+
+var results = await google.SearchAsync("query", count: 5);
+```
+
+```csharp
+// Tavily
 var tavily = new TavilySearchProvider(new() { ApiKey = "YOUR_API_KEY" });
 
 var results = await tavily.SearchAsync("query", count: 5);
@@ -97,6 +109,7 @@ bool allowed = robots.IsAllowed("/admin/page", userAgent: "MyBot");
 
 | Provider | Class | Auth | API Docs |
 |---|---|---|---|
+| Google | `GoogleSearchProvider` | API Key + CX | [Custom Search JSON API](https://developers.google.com/custom-search/v1/overview) |
 | Mojeek | `MojeekSearchProvider` | API Key | [Mojeek Search API](https://www.mojeek.com/services/search/web-search-api/) |
 | SearchApi | `SearchApiProvider` | API Key (Bearer) | [SearchApi](https://www.searchapi.io/) |
 | Tavily | `TavilySearchProvider` | API Key | [Tavily](https://tavily.com/) |
@@ -115,6 +128,10 @@ Each provider handles rate limits automatically via a built-in `RateLimitHandler
 ```csharp
 services.AddWebLookup(options =>
 {
+    options.AddGoogle(g =>
+    {
+        g.AddEngine(config["Google:ApiKey"], config["Google:Cx"]);
+    });
     options.AddMojeek(config["Mojeek:ApiKey"]);
     options.AddSearchApi(config["SearchApi:ApiKey"]);
     options.AddTavily(config["Tavily:ApiKey"]);
