@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WebLookup/WebLookup.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WebLookup.Tests/WebLookup.Tests.csproj" />
+  </Folder>
+</Solution>

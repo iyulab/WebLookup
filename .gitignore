@@ -1,0 +1,25 @@
+# Environment
+.env
+
+# Build outputs
+bin/
+obj/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local
+claudedocs/
+CLAUDE.md
