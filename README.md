@@ -1,5 +1,10 @@
 # WebLookup
 
+[![NuGet](https://img.shields.io/nuget/v/WebLookup)](https://www.nuget.org/packages/WebLookup)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/WebLookup)](https://www.nuget.org/packages/WebLookup)
+[![Build](https://github.com/iyulab/WebLookup/actions/workflows/publish.yml/badge.svg)](https://github.com/iyulab/WebLookup/actions/workflows/publish.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A lightweight .NET library for fast URL discovery across multiple search providers with built-in rate limiting, automatic fallback, and site exploration.
 
 **WebLookup is a URL search engine, not a content parser.** It collects URLs and metadata (title, description) from search APIs and sitemaps, then hands them off to your crawler or parser of choice.
