@@ -63,6 +63,39 @@ foreach (var item in results)
 
 Results are deduplicated by URL. Providers run in parallel. If one provider hits a rate limit, results from others are still returned.
 
+### Response format
+
+`SearchAsync` returns `IReadOnlyList<SearchResult>`:
+
+```
+[DuckDuckGo] Apache Lucene.NET is a powerful open source .NET search library
+  https://lucenenet.apache.org/
+  Apache Lucene.Net is a .NET full-text search engine framework...
+
+[DuckDuckGo] GitHub - apache/lucenenet: Apache Lucene.NET
+  https://github.com/apache/lucenenet
+  Apache Lucene.Net is a high performance search library for .NET...
+
+[Google] WebLookup - NuGet Gallery
+  https://www.nuget.org/packages/WebLookup
+  A lightweight .NET library for fast URL discovery...
+
+[Tavily] Azure Cognitive Search Documentation
+  https://learn.microsoft.com/en-us/azure/search/
+  Cloud search service with built-in AI capabilities...
+```
+
+Each `SearchResult` contains:
+
+| Field | Type | Description |
+|---|---|---|
+| `Url` | `string` | Deduplicated absolute URL |
+| `Title` | `string` | Page title |
+| `Description` | `string?` | Snippet or summary (may be null) |
+| `Provider` | `string?` | Source provider name (`"DuckDuckGo"`, `"Google"`, `"Tavily"`, etc.) |
+
+When using `WebSearchClient` with multiple providers, results are **deduplicated by URL** (case-insensitive, fragments and trailing slashes removed). The first provider to return a URL wins.
+
 ### Use a single provider
 
 ```csharp
