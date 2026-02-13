@@ -66,6 +66,22 @@ public sealed class WebLookupBuilder
         return this;
     }
 
+    public WebLookupBuilder AddDuckDuckGo()
+    {
+        _providerFactories.Add(_ => new DuckDuckGoSearchProvider());
+        return this;
+    }
+
+    public WebLookupBuilder AddDuckDuckGo(string region)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(region);
+        _providerFactories.Add(_ => new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions
+        {
+            Region = region
+        }));
+        return this;
+    }
+
     internal void Build()
     {
         var factories = _providerFactories.ToArray();

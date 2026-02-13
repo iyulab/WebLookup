@@ -122,9 +122,36 @@ public class IntegrationTests
     }
 
     [Fact]
+    public async Task DuckDuckGo_RealSearch()
+    {
+        var provider = new DuckDuckGoSearchProvider();
+
+        IReadOnlyList<SearchResult> results;
+        try
+        {
+            results = await provider.SearchAsync(Query, count: 3);
+        }
+        catch (HttpRequestException)
+        {
+            return; // Skip: network error
+        }
+
+        Assert.NotEmpty(results);
+        Assert.All(results, r =>
+        {
+            Assert.False(string.IsNullOrEmpty(r.Url));
+            Assert.False(string.IsNullOrEmpty(r.Title));
+            Assert.Equal("DuckDuckGo", r.Provider);
+        });
+    }
+
+    [Fact]
     public async Task WebSearchClient_MultiProvider_RealSearch()
     {
         var providers = new List<ISearchProvider>();
+
+        // DuckDuckGo always participates (no API key needed)
+        providers.Add(new DuckDuckGoSearchProvider());
 
         var mojeekKey = GetEnv("MOJEEK_API_KEY");
         if (!string.IsNullOrEmpty(mojeekKey))
@@ -141,9 +168,6 @@ public class IntegrationTests
         var tavilyKey = GetEnv("TAVILY_API_KEY");
         if (!string.IsNullOrEmpty(tavilyKey))
             providers.Add(new TavilySearchProvider(new TavilySearchOptions { ApiKey = tavilyKey }));
-
-        if (providers.Count == 0)
-            return;
 
         using var client = new WebSearchClient([.. providers]);
         var results = await client.SearchAsync(Query);

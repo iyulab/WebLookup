@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageId>WebLookup</PackageId>
     <Description>A lightweight .NET library for fast URL discovery across multiple search providers with built-in rate limiting, automatic fallback, and site exploration.</Description>
-    <PackageTags>search;web;url;google;mojeek;searchapi;tavily;sitemap;robots</PackageTags>
+    <PackageTags>search;web;url;google;mojeek;searchapi;tavily;duckduckgo;sitemap;robots</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 

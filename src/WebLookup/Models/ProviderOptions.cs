@@ -26,3 +26,8 @@ public class GoogleSearchEngine
     public required string ApiKey { get; set; }
     public required string Cx { get; set; }
 }
+
+public class DuckDuckGoSearchOptions
+{
+    public string? Region { get; set; }
+}

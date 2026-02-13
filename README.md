@@ -11,7 +11,7 @@ A lightweight .NET library for fast URL discovery across multiple search provide
 
 ## Features
 
-- **Multi-provider search** — Google, Mojeek, SearchApi, Tavily
+- **Multi-provider search** — DuckDuckGo (no API key), Google, Mojeek, SearchApi, Tavily
 - **Parallel execution** — All configured providers queried simultaneously
 - **Smart fallback** — Continues serving results from healthy providers when one fails or hits rate limits
 - **URL deduplication** — Merges results across providers, removes duplicates
@@ -28,12 +28,23 @@ dotnet add package WebLookup
 
 ## Quick Start
 
+### Zero-config search (no API key needed)
+
+```csharp
+using WebLookup;
+
+// DuckDuckGo requires no API key
+var provider = new DuckDuckGoSearchProvider();
+var results = await provider.SearchAsync("dotnet web search", count: 5);
+```
+
 ### Search across multiple providers
 
 ```csharp
 using WebLookup;
 
 var client = new WebSearchClient(
+    new DuckDuckGoSearchProvider(),  // No API key needed
     new GoogleSearchProvider(new() { Engines = [new() { ApiKey = "...", Cx = "..." }] }),
     new MojeekSearchProvider(new() { ApiKey = "..." }),
     new SearchApiProvider(new() { ApiKey = "..." }),
@@ -114,6 +125,7 @@ bool allowed = robots.IsAllowed("/admin/page", userAgent: "MyBot");
 
 | Provider | Class | Auth | API Docs |
 |---|---|---|---|
+| DuckDuckGo | `DuckDuckGoSearchProvider` | None | [HTML Lite](https://html.duckduckgo.com/html/) |
 | Google | `GoogleSearchProvider` | API Key + CX | [Custom Search JSON API](https://developers.google.com/custom-search/v1/overview) |
 | Mojeek | `MojeekSearchProvider` | API Key | [Mojeek Search API](https://www.mojeek.com/services/search/web-search-api/) |
 | SearchApi | `SearchApiProvider` | API Key (Bearer) | [SearchApi](https://www.searchapi.io/) |
@@ -133,6 +145,7 @@ Each provider handles rate limits automatically via a built-in `RateLimitHandler
 ```csharp
 services.AddWebLookup(options =>
 {
+    options.AddDuckDuckGo();  // No API key needed
     options.AddGoogle(g =>
     {
         g.AddEngine(config["Google:ApiKey"], config["Google:Cx"]);

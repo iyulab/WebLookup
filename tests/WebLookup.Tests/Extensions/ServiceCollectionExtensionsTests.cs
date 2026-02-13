@@ -160,4 +160,47 @@ public class ServiceCollectionExtensionsTests
             });
         });
     }
+
+    [Fact]
+    public void AddDuckDuckGo_ZeroConfig_RegistersProvider()
+    {
+        var services = new ServiceCollection();
+
+        services.AddWebLookup(builder =>
+        {
+            builder.AddDuckDuckGo();
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<WebSearchClient>();
+
+        Assert.NotNull(client);
+    }
+
+    [Fact]
+    public void AddDuckDuckGo_WithRegion_RegistersProvider()
+    {
+        var services = new ServiceCollection();
+
+        services.AddWebLookup(builder =>
+        {
+            builder.AddDuckDuckGo("kr-ko");
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<WebSearchClient>();
+
+        Assert.NotNull(client);
+    }
+
+    [Fact]
+    public void AddDuckDuckGo_EmptyRegion_Throws()
+    {
+        var services = new ServiceCollection();
+
+        Assert.Throws<ArgumentException>(() =>
+        {
+            services.AddWebLookup(builder => builder.AddDuckDuckGo(""));
+        });
+    }
 }
