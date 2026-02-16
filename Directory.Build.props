@@ -3,6 +3,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!-- CA1707: test method naming convention (e.g. Should_Return_...) -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
     <Version>0.2.0</Version>
     <Authors>iyulab</Authors>
     <RepositoryUrl>https://github.com/iyulab/WebLookup</RepositoryUrl>
