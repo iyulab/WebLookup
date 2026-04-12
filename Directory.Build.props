@@ -12,4 +12,10 @@
     <RepositoryUrl>https://github.com/iyulab/WebLookup</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)../../local-packages')">
+    <RestoreAdditionalProjectSources>
+      $(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../../local-packages
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
 </Project>
