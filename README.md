@@ -164,6 +164,20 @@ bool allowed = robots.IsAllowed("/admin/page", userAgent: "MyBot");
 | SearchApi | `SearchApiProvider` | API Key (Bearer) | [SearchApi](https://www.searchapi.io/) |
 | Tavily | `TavilySearchProvider` | API Key | [Tavily](https://tavily.com/) |
 
+### Provider options
+
+**DuckDuckGo** — accepts an optional region code:
+
+```csharp
+var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions { Region = "us-en" });
+```
+
+**SearchApi** — defaults to `Engine = "google"`, override with any engine name the SearchApi service supports:
+
+```csharp
+var provider = new SearchApiProvider(new SearchApiOptions { ApiKey = "...", Engine = "bing" });
+```
+
 ## Rate Limiting
 
 Each provider handles rate limits automatically via a built-in `RateLimitHandler`:
@@ -178,13 +192,15 @@ Each provider handles rate limits automatically via a built-in `RateLimitHandler
 ```csharp
 services.AddWebLookup(options =>
 {
-    options.AddDuckDuckGo();  // No API key needed
+    options.AddDuckDuckGo();              // No API key needed
+    options.AddDuckDuckGo("us-en");       // With optional region code
     options.AddGoogle(g =>
     {
         g.AddEngine(config["Google:ApiKey"], config["Google:Cx"]);
     });
     options.AddMojeek(config["Mojeek:ApiKey"]);
-    options.AddSearchApi(config["SearchApi:ApiKey"]);
+    options.AddSearchApi(config["SearchApi:ApiKey"]);          // defaults to engine "google"
+    options.AddSearchApi(config["SearchApi:ApiKey"], "bing");  // specify engine
     options.AddTavily(config["Tavily:ApiKey"]);
 });
 
@@ -204,6 +220,25 @@ public record SearchResult
     public string? Description { get; init; }
     public string? Provider { get; init; }
 }
+```
+
+### WebSearchOptions
+
+Controls behavior of `WebSearchClient`. Set via `client.Options` or pass an instance to the `SearchAsync` overload.
+
+```csharp
+public class WebSearchOptions
+{
+    public int MaxResultsPerProvider { get; set; } = 10;
+}
+```
+
+```csharp
+var client = new WebSearchClient(provider);
+client.Options.MaxResultsPerProvider = 5;
+
+// or per-call
+var results = await client.SearchAsync("query", new WebSearchOptions { MaxResultsPerProvider = 3 });
 ```
 
 ### ISearchProvider
