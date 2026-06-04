@@ -24,3 +24,6 @@ Thumbs.db
 claudedocs/
 CLAUDE.md
 nul
+
+# IDE language server cache
+*.lscache
