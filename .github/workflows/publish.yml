@@ -30,7 +30,7 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Test
-        run: dotnet test -c Release --no-build
+        run: dotnet test -c Release --no-build --blame-hang --blame-hang-timeout 5m
 
       - name: Pack
         run: dotnet pack src/WebLookup/WebLookup.csproj -c Release --no-build -o ./nupkg
