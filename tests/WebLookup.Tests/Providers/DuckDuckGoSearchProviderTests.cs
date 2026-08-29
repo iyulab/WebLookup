@@ -24,7 +24,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.Equal("Result One", results[0].Title);
@@ -49,7 +49,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        await provider.SearchAsync("test");
+        await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpMethod.Post, method);
     }
@@ -68,7 +68,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        var results = await provider.SearchAsync("test", count: 3);
+        var results = await provider.SearchAsync("test", count: 3, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(3, results.Count);
     }
@@ -87,7 +87,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal("https://example.com/path?q=hello&lang=en", results[0].Url);
@@ -107,7 +107,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal("The Bold Title", results[0].Title);
@@ -131,7 +131,7 @@ public class DuckDuckGoSearchProviderTests
         var provider = new DuckDuckGoSearchProvider(
             new DuckDuckGoSearchOptions { Region = "kr-ko" }, client);
 
-        await provider.SearchAsync("test");
+        await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Contains("kl=kr-ko", body);
     }
@@ -152,7 +152,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        await provider.SearchAsync("test");
+        await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain("kl=", body);
     }
@@ -164,7 +164,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        var results = await provider.SearchAsync("no results");
+        var results = await provider.SearchAsync("no results", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
     }
@@ -191,7 +191,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.Equal("https://example.com/1", results[0].Url);
@@ -222,7 +222,7 @@ public class DuckDuckGoSearchProviderTests
         var client = new HttpClient(handler);
         var provider = new DuckDuckGoSearchProvider(new DuckDuckGoSearchOptions(), client);
 
-        await provider.SearchAsync("test");
+        await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("https://html.duckduckgo.com/", referer);
     }

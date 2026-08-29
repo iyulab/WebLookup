@@ -44,7 +44,7 @@ public class IntegrationTests
         IReadOnlyList<SearchResult> results;
         try
         {
-            results = await provider.SearchAsync(Query, count: 3);
+            results = await provider.SearchAsync(Query, count: 3, cancellationToken: TestContext.Current.CancellationToken);
         }
         catch (HttpRequestException ex) when (IsAuthError(ex))
         {
@@ -77,7 +77,7 @@ public class IntegrationTests
         IReadOnlyList<SearchResult> results;
         try
         {
-            results = await provider.SearchAsync(Query, count: 3);
+            results = await provider.SearchAsync(Query, count: 3, cancellationToken: TestContext.Current.CancellationToken);
         }
         catch (HttpRequestException ex) when (IsAuthError(ex))
         {
@@ -105,7 +105,7 @@ public class IntegrationTests
         IReadOnlyList<SearchResult> results;
         try
         {
-            results = await provider.SearchAsync(Query, count: 3);
+            results = await provider.SearchAsync(Query, count: 3, cancellationToken: TestContext.Current.CancellationToken);
         }
         catch (HttpRequestException ex) when (IsAuthError(ex))
         {
@@ -129,7 +129,7 @@ public class IntegrationTests
         IReadOnlyList<SearchResult> results;
         try
         {
-            results = await provider.SearchAsync(Query, count: 3);
+            results = await provider.SearchAsync(Query, count: 3, cancellationToken: TestContext.Current.CancellationToken);
         }
         catch (HttpRequestException)
         {
@@ -172,7 +172,7 @@ public class IntegrationTests
             providers.Add(new TavilySearchProvider(new TavilySearchOptions { ApiKey = tavilyKey }));
 
         using var client = new WebSearchClient([.. providers]);
-        var results = await client.SearchAsync(Query);
+        var results = await client.SearchAsync(Query, TestContext.Current.CancellationToken);
 
         if (results.Count == 0)
             return; // All providers may have invalid keys

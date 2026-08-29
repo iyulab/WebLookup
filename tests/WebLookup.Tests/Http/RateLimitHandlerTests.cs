@@ -13,7 +13,7 @@ public class RateLimitHandlerTests
         var handler = new RateLimitHandler(inner, maxRetries: 3);
         var client = new HttpClient(handler);
 
-        var response = await client.GetAsync("https://example.com/api");
+        var response = await client.GetAsync("https://example.com/api", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -38,7 +38,7 @@ public class RateLimitHandlerTests
         var handler = new RateLimitHandler(inner, maxRetries: 3);
         var client = new HttpClient(handler);
 
-        var response = await client.GetAsync("https://example.com/api");
+        var response = await client.GetAsync("https://example.com/api", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(2, callCount);
@@ -63,7 +63,7 @@ public class RateLimitHandlerTests
         var handler = new RateLimitHandler(inner, maxRetries: 3);
         var client = new HttpClient(handler);
 
-        var response = await client.GetAsync("https://example.com/api");
+        var response = await client.GetAsync("https://example.com/api", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(2, callCount);
@@ -78,7 +78,7 @@ public class RateLimitHandlerTests
         var handler = new RateLimitHandler(inner, maxRetries: 2);
         var client = new HttpClient(handler);
 
-        var response = await client.GetAsync("https://example.com/api");
+        var response = await client.GetAsync("https://example.com/api", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
     }
@@ -94,7 +94,7 @@ public class RateLimitHandlerTests
             onRateLimited: (provider, _) => reportedProvider = provider);
         var client = new HttpClient(handler);
 
-        await client.GetAsync("https://example.com/api");
+        await client.GetAsync("https://example.com/api", TestContext.Current.CancellationToken);
 
         Assert.Equal("example.com", reportedProvider);
     }

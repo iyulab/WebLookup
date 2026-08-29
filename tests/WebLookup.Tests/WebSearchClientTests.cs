@@ -18,7 +18,7 @@ public class WebSearchClientTests
         ]);
 
         var client = new WebSearchClient(provider1, provider2);
-        var results = await client.SearchAsync("test");
+        var results = await client.SearchAsync("test", TestContext.Current.CancellationToken);
 
         Assert.Equal(3, results.Count);
         // First-seen wins: page1 should come from P1
@@ -39,7 +39,7 @@ public class WebSearchClientTests
         ]);
 
         var client = new WebSearchClient(provider1, provider2);
-        var results = await client.SearchAsync("test");
+        var results = await client.SearchAsync("test", TestContext.Current.CancellationToken);
 
         Assert.Single(results);
     }
@@ -54,7 +54,7 @@ public class WebSearchClientTests
         ]);
 
         var client = new WebSearchClient(failingProvider, workingProvider);
-        var results = await client.SearchAsync("test");
+        var results = await client.SearchAsync("test", TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal("OK", results[0].Title);
@@ -74,7 +74,7 @@ public class WebSearchClientTests
         ]);
 
         var client = new WebSearchClient(provider1, provider2);
-        var results = await client.SearchAsync("test");
+        var results = await client.SearchAsync("test", TestContext.Current.CancellationToken);
 
         Assert.Single(results);
     }
@@ -119,7 +119,7 @@ public class WebSearchClientTests
     public async Task SearchAsync_EmptyProviders_ReturnsEmpty()
     {
         var client = new WebSearchClient();
-        var results = await client.SearchAsync("test");
+        var results = await client.SearchAsync("test", TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
     }

@@ -31,7 +31,7 @@ public class MojeekSearchProviderTests
             new MojeekSearchOptions { ApiKey = "test-key" },
             client);
 
-        var results = await provider.SearchAsync("test query", count: 5);
+        var results = await provider.SearchAsync("test query", count: 5, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.Equal("Mojeek Result", results[0].Title);
@@ -58,7 +58,7 @@ public class MojeekSearchProviderTests
             new MojeekSearchOptions { ApiKey = "key" },
             client);
 
-        var results = await provider.SearchAsync("no results");
+        var results = await provider.SearchAsync("no results", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
     }
@@ -73,7 +73,7 @@ public class MojeekSearchProviderTests
             new MojeekSearchOptions { ApiKey = "key" },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
     }
@@ -100,7 +100,7 @@ public class MojeekSearchProviderTests
             new MojeekSearchOptions { ApiKey = "key" },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.Equal("https://example.com/1", results[0].Url);
@@ -125,7 +125,7 @@ public class MojeekSearchProviderTests
             new MojeekSearchOptions { ApiKey = "my-key" },
             client);
 
-        await provider.SearchAsync("test query", count: 7);
+        await provider.SearchAsync("test query", count: 7, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(requestUrl);
         Assert.Contains("api_key=my-key", requestUrl);

@@ -4,11 +4,11 @@
     <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
-    <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!-- Test (xUnit v3 / Microsoft.Testing.Platform — BD-20260829-xunit-v3-pilot rollout) -->
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="2.3.3" />
   </ItemGroup>
 </Project>

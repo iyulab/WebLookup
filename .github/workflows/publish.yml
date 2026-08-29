@@ -30,7 +30,8 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Test
-        run: dotnet test -c Release --no-build --blame-hang --blame-hang-timeout 5m
+        # --hangdump/--hangdump-timeout is MTP's equivalent of VSTest's --blame-hang.
+        run: dotnet test -c Release --no-build --hangdump --hangdump-timeout 5m
 
       - name: Pack
         run: dotnet pack src/WebLookup/WebLookup.csproj -c Release --no-build -o ./nupkg

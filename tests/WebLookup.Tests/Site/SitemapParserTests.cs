@@ -119,7 +119,7 @@ public class SitemapParserTests
         using var ms = new MemoryStream();
         await using (var gzip = new GZipStream(ms, CompressionLevel.Fastest, leaveOpen: true))
         {
-            await gzip.WriteAsync(bytes);
+            await gzip.WriteAsync(bytes, TestContext.Current.CancellationToken);
         }
         ms.Position = 0;
         var gzipBytes = ms.ToArray();

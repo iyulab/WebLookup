@@ -24,7 +24,7 @@ public class SearchApiProviderTests
             new SearchApiOptions { ApiKey = "test-key" },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal("SearchApi Result", results[0].Title);
@@ -51,7 +51,7 @@ public class SearchApiProviderTests
             new SearchApiOptions { ApiKey = "my-secret-key" },
             client);
 
-        await provider.SearchAsync("test");
+        await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal("Bearer my-secret-key", authHeader);
     }
@@ -74,7 +74,7 @@ public class SearchApiProviderTests
             new SearchApiOptions { ApiKey = "key", Engine = "bing" },
             client);
 
-        await provider.SearchAsync("test");
+        await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Contains("engine=bing", requestUrl);
     }
@@ -89,7 +89,7 @@ public class SearchApiProviderTests
             new SearchApiOptions { ApiKey = "key" },
             client);
 
-        var results = await provider.SearchAsync("no results");
+        var results = await provider.SearchAsync("no results", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
     }
@@ -104,7 +104,7 @@ public class SearchApiProviderTests
             new SearchApiOptions { ApiKey = "key" },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
     }
@@ -128,7 +128,7 @@ public class SearchApiProviderTests
             new SearchApiOptions { ApiKey = "key" },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.Equal("https://example.com/1", results[0].Url);
@@ -153,7 +153,7 @@ public class SearchApiProviderTests
             new SearchApiOptions { ApiKey = "key" },
             client);
 
-        await provider.SearchAsync("test", count: 20);
+        await provider.SearchAsync("test", count: 20, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Contains("num=20", requestUrl);
     }

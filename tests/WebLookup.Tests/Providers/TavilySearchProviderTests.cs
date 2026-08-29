@@ -23,7 +23,7 @@ public class TavilySearchProviderTests
             new TavilySearchOptions { ApiKey = "test-key" },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal("Tavily Result", results[0].Title);
@@ -50,7 +50,7 @@ public class TavilySearchProviderTests
             new TavilySearchOptions { ApiKey = "key" },
             client);
 
-        await provider.SearchAsync("test");
+        await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpMethod.Post, capturedMethod);
     }
@@ -66,7 +66,7 @@ public class TavilySearchProviderTests
             new TavilySearchOptions { ApiKey = "test-key" },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
     }
@@ -89,7 +89,7 @@ public class TavilySearchProviderTests
             new TavilySearchOptions { ApiKey = "my-key-123" },
             client);
 
-        await provider.SearchAsync("test query", count: 5);
+        await provider.SearchAsync("test query", count: 5, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.NotNull(capturedBody);
         Assert.Contains("my-key-123", capturedBody);
@@ -117,7 +117,7 @@ public class TavilySearchProviderTests
             new TavilySearchOptions { ApiKey = "test-key" },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.Equal("https://example.com/1", results[0].Url);

@@ -28,7 +28,7 @@ public class GoogleSearchProviderTests
             },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal("Google Result 1", results[0].Title);
@@ -79,7 +79,7 @@ public class GoogleSearchProviderTests
             },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(3, results.Count);
         Assert.Single(results, r => r.Url == "https://example.com/shared");
@@ -100,7 +100,7 @@ public class GoogleSearchProviderTests
             },
             client);
 
-        var results = await provider.SearchAsync("no results");
+        var results = await provider.SearchAsync("no results", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(results);
     }
@@ -127,7 +127,7 @@ public class GoogleSearchProviderTests
             },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(2, results.Count);
         Assert.Equal("https://example.com/1", results[0].Url);
@@ -155,7 +155,7 @@ public class GoogleSearchProviderTests
             },
             client);
 
-        await provider.SearchAsync("test", count: 50);
+        await provider.SearchAsync("test", count: 50, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Contains("num=10", requestUrl);
     }
@@ -181,7 +181,7 @@ public class GoogleSearchProviderTests
             },
             client);
 
-        await provider.SearchAsync("test", count: 5);
+        await provider.SearchAsync("test", count: 5, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Contains("num=5", requestUrl);
     }
@@ -226,7 +226,7 @@ public class GoogleSearchProviderTests
             },
             client);
 
-        var results = await provider.SearchAsync("test");
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Single(results);
         Assert.Equal("Surviving Result", results[0].Title);

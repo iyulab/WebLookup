@@ -30,7 +30,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetRobotsAsync(s_baseUri);
+        var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Rules.Count);
         Assert.Single(result.Sitemaps);
@@ -45,7 +45,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetRobotsAsync(s_baseUri);
+        var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.True(result.IsAllowed("/any/path"));
         Assert.Empty(result.Rules);
@@ -58,7 +58,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetRobotsAsync(s_baseUri);
+        var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.False(result.IsAllowed("/any/path"));
     }
@@ -70,7 +70,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetRobotsAsync(s_baseUri);
+        var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.False(result.IsAllowed("/any/path"));
     }
@@ -83,7 +83,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetRobotsAsync(s_baseUri);
+        var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.False(result.IsAllowed("/any/path"));
     }
@@ -100,7 +100,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        await _explorer.GetRobotsAsync(s_baseUri);
+        await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.NotNull(requestedUri);
         Assert.Equal("https://example.com/robots.txt", requestedUri.ToString());
@@ -118,7 +118,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        await _explorer.GetRobotsAsync(new Uri("https://example.com/some/path/page.html"));
+        await _explorer.GetRobotsAsync(new Uri("https://example.com/some/path/page.html"), TestContext.Current.CancellationToken);
 
         Assert.NotNull(requestedUri);
         Assert.Equal("https://example.com/robots.txt", requestedUri.ToString());
@@ -136,7 +136,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetRobotsAsync(s_baseUri);
+        var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.Equal(TimeSpan.FromSeconds(5), result.CrawlDelay);
     }
@@ -166,7 +166,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetSitemapAsync(s_sitemapUri);
+        var result = await _explorer.GetSitemapAsync(s_sitemapUri, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Count);
         Assert.Equal("https://example.com/page1", result[0].Url);
@@ -185,7 +185,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetSitemapAsync(s_sitemapUri);
+        var result = await _explorer.GetSitemapAsync(s_sitemapUri, TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
     }
@@ -197,7 +197,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetSitemapAsync(s_sitemapUri);
+        var result = await _explorer.GetSitemapAsync(s_sitemapUri, TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
     }
@@ -210,7 +210,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        var result = await _explorer.GetSitemapAsync(s_sitemapUri);
+        var result = await _explorer.GetSitemapAsync(s_sitemapUri, TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
     }
@@ -241,7 +241,7 @@ public class SiteExplorerTests : IDisposable
         _explorer = new SiteExplorer(client);
 
         var entries = new List<SitemapEntry>();
-        await foreach (var entry in _explorer.StreamSitemapAsync(s_sitemapUri))
+        await foreach (var entry in _explorer.StreamSitemapAsync(s_sitemapUri, TestContext.Current.CancellationToken))
         {
             entries.Add(entry);
         }
@@ -264,7 +264,7 @@ public class SiteExplorerTests : IDisposable
         _explorer = new SiteExplorer(client);
 
         var entries = new List<SitemapEntry>();
-        await foreach (var entry in _explorer.StreamSitemapAsync(s_sitemapUri))
+        await foreach (var entry in _explorer.StreamSitemapAsync(s_sitemapUri, TestContext.Current.CancellationToken))
         {
             entries.Add(entry);
         }
@@ -300,7 +300,7 @@ public class SiteExplorerTests : IDisposable
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
-        await _explorer.GetRobotsAsync(s_baseUri);
+        await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.NotNull(requestedUri);
     }
