@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- xUnit v3 test projects are stand-alone executables (BD-20260829-xunit-v3-pilot) -->
+    <!-- xUnit v3 test projects are stand-alone executables -->
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- xUnit v3 pilot rollout: xunit replaced with xunit.v3, no Microsoft.NET.Test.Sdk (not
+    <!-- xunit.v3, no Microsoft.NET.Test.Sdk (not
          required under Microsoft.Testing.Platform), coverlet.collector dropped (unused: CI never
          invoked collect against it). xunit.runner.visualstudio kept for IDE Test Explorer discovery. -->
     <PackageReference Include="xunit.v3" />
@@ -18,7 +18,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <!-- MTP equivalent of the ecosystem's VSTest blame-hang convention (BD-20260828-07) -->
+    <!-- Hang dumps for a test that stops responding (MTP equivalent of VSTest blame-hang) -->
     <PackageReference Include="Microsoft.Testing.Extensions.HangDump" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Iyu.Conventions.Testing" />

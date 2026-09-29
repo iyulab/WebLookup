@@ -2,6 +2,8 @@ using System.Net;
 
 namespace WebLookup.Tests;
 
+// These call live search services over the network, so CI does not run them.
+[Trait("Category", "Integration")]
 public class IntegrationTests
 {
     private static readonly string Query = "dotnet web search library";

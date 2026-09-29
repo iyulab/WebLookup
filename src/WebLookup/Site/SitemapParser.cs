@@ -7,7 +7,6 @@ namespace WebLookup.Site;
 
 internal static class SitemapParser
 {
-    private static readonly XNamespace SitemapNs = "http://www.sitemaps.org/schemas/sitemap/0.9";
     private const int MaxRecursionDepth = 10;
 
     public static async Task<IReadOnlyList<SitemapEntry>> ParseAsync(
