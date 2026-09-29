@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [0.3.0] - Unreleased
+
+### Changed
+
+- **`GetRobotsAsync` follows RFC 9309 for a robots.txt it cannot read.** A `4xx` status (`401`, `403`, `410`, …) now
+  means the file is unavailable and no rules apply (everything allowed); before, only `404` did and every other `4xx`
+  disallowed the whole site. A `5xx` status, `429 Too Many Requests` and a connection failure still disallow
+  everything.
+
+### Fixed
+
+- **A robots.txt request that times out now disallows everything, like a connection failure**, instead of throwing
+  `TaskCanceledException` out of `GetRobotsAsync`. Cancelling the call through its token still throws.
+
 ## [0.2.4] - 2026-09-30
 
 ### Fixed

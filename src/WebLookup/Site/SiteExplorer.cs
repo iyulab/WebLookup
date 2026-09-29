@@ -35,21 +35,31 @@ public sealed class SiteExplorer : IDisposable
         var robotsUri = new Uri(baseUri, "/robots.txt");
         var client = GetHttpClient();
 
+        // RFC 9309 §2.3.1: a robots.txt that is "unavailable" (a 4xx status) means no rules apply; one that is
+        // "unreachable" (a 5xx status, a network error, a timeout) means the whole site is disallowed. 429 Too Many
+        // Requests is the server saying "not now", not "there is no file", so it counts as unreachable.
         try
         {
             using var response = await client.GetAsync(robotsUri, cancellationToken);
 
-            if (response.StatusCode == HttpStatusCode.NotFound)
-                return RobotsParser.AllowAll;
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                return RobotsParser.Parse(content);
+            }
 
-            if (!response.IsSuccessStatusCode)
-                return RobotsParser.DisallowAll;
-
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            return RobotsParser.Parse(content);
+            var status = (int)response.StatusCode;
+            return status is >= 400 and < 500 && response.StatusCode != HttpStatusCode.TooManyRequests
+                ? RobotsParser.AllowAll
+                : RobotsParser.DisallowAll;
         }
         catch (HttpRequestException)
         {
+            return RobotsParser.DisallowAll;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // The client's timeout, not the caller's cancellation: the file is unreachable.
             return RobotsParser.DisallowAll;
         }
     }

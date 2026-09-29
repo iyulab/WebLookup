@@ -63,16 +63,59 @@ public class SiteExplorerTests : IDisposable
         Assert.False(result.IsAllowed("/any/path"));
     }
 
-    [Fact]
-    public async Task GetRobotsAsync_Forbidden_ReturnsDisallowAll()
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.Gone)]
+    public async Task GetRobotsAsync_ClientError_ReturnsAllowAll(HttpStatusCode status)
     {
-        var handler = new MockHttpHandler(HttpStatusCode.Forbidden, "");
+        // RFC 9309 §2.3.1.3: an "unavailable" robots.txt (4xx) means no rules apply.
+        var handler = new MockHttpHandler(status, "");
+        var client = new HttpClient(handler);
+        _explorer = new SiteExplorer(client);
+
+        var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsAllowed("/any/path"));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task GetRobotsAsync_RateLimitedOrUnavailableServer_ReturnsDisallowAll(HttpStatusCode status)
+    {
+        // RFC 9309 §2.3.1.4: an "unreachable" robots.txt means the whole site is disallowed.
+        var handler = new MockHttpHandler(status, "");
         var client = new HttpClient(handler);
         _explorer = new SiteExplorer(client);
 
         var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
 
         Assert.False(result.IsAllowed("/any/path"));
+    }
+
+    [Fact]
+    public async Task GetRobotsAsync_ClientTimeout_ReturnsDisallowAll()
+    {
+        // Same outcome as a connection failure: the file is unreachable.
+        var client = new HttpClient(new NeverRespondingHandler()) { Timeout = TimeSpan.FromMilliseconds(50) };
+        _explorer = new SiteExplorer(client);
+
+        var result = await _explorer.GetRobotsAsync(s_baseUri, TestContext.Current.CancellationToken);
+
+        Assert.False(result.IsAllowed("/any/path"));
+    }
+
+    [Fact]
+    public async Task GetRobotsAsync_CallerCancellation_Propagates()
+    {
+        var handler = new MockHttpHandler(HttpStatusCode.OK, "");
+        var client = new HttpClient(handler);
+        _explorer = new SiteExplorer(client);
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _explorer.GetRobotsAsync(s_baseUri, cts.Token));
     }
 
     [Fact]
@@ -321,4 +364,14 @@ public class SiteExplorerTests : IDisposable
     }
 
     #endregion
+
+    /// <summary>Waits until the request is cancelled — the shape of a server that never answers.</summary>
+    private sealed class NeverRespondingHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
 }

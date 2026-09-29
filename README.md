@@ -159,8 +159,9 @@ await foreach (var entry in explorer.StreamSitemapAsync(new Uri("https://example
 
 How `SiteExplorer` treats what the server returns:
 
-- **robots.txt** — `404 Not Found` means no rules (everything allowed). Any other unsuccessful status (including `401`,
-  `403` and `5xx`) and a connection failure (`HttpRequestException`) mean everything is disallowed.
+- **robots.txt** — follows RFC 9309: a `4xx` status (`404`, `401`, `403`, …) means the file is unavailable and no
+  rules apply (everything allowed). A `5xx` status, `429 Too Many Requests`, a connection failure and a client
+  timeout mean the file is unreachable and everything is disallowed. Cancelling the call throws as usual.
 - **Sitemaps** — a `<sitemapindex>` is followed into its child sitemaps (up to 10 levels deep); `.gz` files and
   `Content-Encoding: gzip` responses are decompressed. A sitemap that cannot be fetched or parsed yields no entries
   instead of throwing, so an empty result can mean the fetch failed. `StreamSitemapAsync` yields entries as each
