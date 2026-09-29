@@ -12,13 +12,13 @@ A lightweight .NET library for fast URL discovery across multiple search provide
 ## Features
 
 - **Multi-provider search** — DuckDuckGo (no API key), Google, Mojeek, SearchApi, Tavily
-- **Parallel execution** — All configured providers queried simultaneously
-- **Smart fallback** — Continues serving results from healthy providers when one fails or hits rate limits
-- **URL deduplication** — Merges results across providers, removes duplicates
-- **Site exploration** — Parse `robots.txt` rules and `sitemap.xml` hierarchies
-- **Rate limit handling** — Auto-detects 429/Retry-After, exponential backoff per provider
-- **Minimal dependencies** — Built on `System.Net.Http` and `System.Text.Json`; optional DI integration
-- **DI-friendly** — First-class `Microsoft.Extensions.DependencyInjection` support
+- **Parallel execution** — `WebSearchClient` queries all of its providers at the same time
+- **Fallback** — a provider that throws (network error, rejected API key, rate limit still hit after its retries) contributes no results; the other providers' results are still returned. The failure itself is not reported.
+- **URL deduplication** — merges results across providers and removes duplicates
+- **Site exploration** — parse `robots.txt` rules and `sitemap.xml` files, including sitemap indexes and gzip
+- **Rate limit handling** — retries HTTP 429 with exponential backoff and honours `Retry-After` (when the provider creates its own `HttpClient`)
+- **Small footprint** — built on `System.Net.Http`, `System.Text.Json` and `System.Xml.Linq`; the one package dependency is `Microsoft.Extensions.DependencyInjection.Abstractions`
+- **DI-friendly** — `services.AddWebLookup(...)` registers `WebSearchClient` and `SiteExplorer`
 
 ## Installation
 
@@ -27,6 +27,8 @@ dotnet add package WebLookup
 ```
 
 ## Quick Start
+
+All types are in the `WebLookup` namespace; the examples below assume `using WebLookup;`.
 
 ### Zero-config search (no API key needed)
 
@@ -41,9 +43,7 @@ var results = await provider.SearchAsync("dotnet web search", count: 5);
 ### Search across multiple providers
 
 ```csharp
-using WebLookup;
-
-var client = new WebSearchClient(
+using var client = new WebSearchClient(
     new DuckDuckGoSearchProvider(),  // No API key needed
     new GoogleSearchProvider(new() { Engines = [new() { ApiKey = "...", Cx = "..." }] }),
     new MojeekSearchProvider(new() { ApiKey = "..." }),
@@ -61,7 +61,9 @@ foreach (var item in results)
 }
 ```
 
-Results are deduplicated by URL. Providers run in parallel. If one provider hits a rate limit, results from others are still returned.
+Providers run in parallel and `SearchAsync` returns once every provider has answered or failed. A provider that throws
+contributes no results, so a rate-limited or misconfigured provider does not stop the others — and does not raise an
+error either: an empty or short list can mean a provider failed. Disposing the client disposes its providers.
 
 ### Response format
 
@@ -89,12 +91,15 @@ Each `SearchResult` contains:
 
 | Field | Type | Description |
 |---|---|---|
-| `Url` | `string` | Deduplicated absolute URL |
+| `Url` | `string` | The URL as the provider returned it |
 | `Title` | `string` | Page title |
 | `Description` | `string?` | Snippet or summary (may be null) |
-| `Provider` | `string?` | Source provider name (`"DuckDuckGo"`, `"Google"`, `"Tavily"`, etc.) |
+| `Provider` | `string?` | Source provider name (`"DuckDuckGo"`, `"Google"`, `"Mojeek"`, `"SearchApi"`, `"Tavily"`) |
 
-When using `WebSearchClient` with multiple providers, results are **deduplicated by URL** (case-insensitive, fragments and trailing slashes removed). The first provider to return a URL wins.
+`WebSearchClient` **deduplicates by URL**: two URLs are the same when they differ only in letter case (anywhere in the
+URL, path and query included), a `#fragment`, a default port or a trailing slash. When several providers return the same
+URL, the result from the provider passed **first** to the constructor is kept — the order of the providers, not the order
+in which they answer. The kept result's `Url` is not rewritten.
 
 ### Use a single provider
 
@@ -108,6 +113,9 @@ var google = new GoogleSearchProvider(new()
 var results = await google.SearchAsync("query", count: 5);
 ```
 
+Google returns at most 10 results per engine (`count` above 10 is capped). With several `Engines`, all of them are queried
+in parallel and their results merged; an engine that fails is skipped.
+
 ```csharp
 // Tavily
 var tavily = new TavilySearchProvider(new() { ApiKey = "YOUR_API_KEY" });
@@ -115,12 +123,16 @@ var tavily = new TavilySearchProvider(new() { ApiKey = "YOUR_API_KEY" });
 var results = await tavily.SearchAsync("query", count: 5);
 ```
 
+A single provider called directly **does** throw on failure (`HttpRequestException` for a rejected key or an HTTP error);
+only `WebSearchClient` turns a failure into an empty contribution. The exception is `GoogleSearchProvider`, which skips a
+failing engine and so returns an empty list when its only engine fails.
+
 ### Explore a site
 
 ```csharp
-var explorer = new SiteExplorer();
+using var explorer = new SiteExplorer();
 
-// Read robots.txt
+// Read robots.txt (always from the site root: https://example.com/robots.txt)
 var robots = await explorer.GetRobotsAsync(new Uri("https://example.com"));
 Console.WriteLine($"Crawl-Delay: {robots.CrawlDelay}");
 Console.WriteLine($"Sitemaps: {string.Join(", ", robots.Sitemaps)}");
@@ -130,7 +142,7 @@ foreach (var rule in robots.Rules)
     Console.WriteLine($"[{rule.UserAgent}] {rule.Type}: {rule.Path}");
 }
 
-// Read sitemap
+// Read a sitemap (a sitemap index is followed into its child sitemaps)
 var entries = await explorer.GetSitemapAsync(new Uri("https://example.com/sitemap.xml"));
 
 foreach (var entry in entries)
@@ -138,12 +150,23 @@ foreach (var entry in entries)
     Console.WriteLine($"{entry.Url} (modified: {entry.LastModified}, priority: {entry.Priority})");
 }
 
-// Stream large sitemaps
+// Stream the entries instead of collecting them into a list
 await foreach (var entry in explorer.StreamSitemapAsync(new Uri("https://example.com/sitemap.xml")))
 {
     Console.WriteLine(entry.Url);
 }
 ```
+
+How `SiteExplorer` treats what the server returns:
+
+- **robots.txt** — `404 Not Found` means no rules (everything allowed). Any other unsuccessful status (including `401`,
+  `403` and `5xx`) and a connection failure (`HttpRequestException`) mean everything is disallowed.
+- **Sitemaps** — a `<sitemapindex>` is followed into its child sitemaps (up to 10 levels deep); `.gz` files and
+  `Content-Encoding: gzip` responses are decompressed. A sitemap that cannot be fetched or parsed yields no entries
+  instead of throwing, so an empty result can mean the fetch failed. `StreamSitemapAsync` yields entries as each
+  sitemap file is parsed; each file is still loaded in full, so streaming saves memory across the files of an index,
+  not within one large file.
+- **Crawl-Delay** — `CrawlDelay` is the last `Crawl-delay` line in the file, whichever user-agent group it sits in.
 
 ### Filter URLs with robots.txt rules
 
@@ -154,15 +177,28 @@ var robots = await explorer.GetRobotsAsync(new Uri("https://example.com"));
 bool allowed = robots.IsAllowed("/admin/page", userAgent: "MyBot");
 ```
 
+`IsAllowed` follows RFC 9309: the rules of the group naming your user agent apply (the `*` group only when no group
+names it), the longest matching path wins, and `Allow` wins a tie; `*` and `$` in paths are supported. The user agent is
+compared with the group's name as a whole token, ignoring case — pass `"MyBot"`, not `"MyBot/1.0"`.
+
 ## Providers
 
 | Provider | Class | Auth | API Docs |
 |---|---|---|---|
-| DuckDuckGo | `DuckDuckGoSearchProvider` | None | [HTML Lite](https://html.duckduckgo.com/html/) |
+| DuckDuckGo | `DuckDuckGoSearchProvider` | None | [HTML version](https://html.duckduckgo.com/html/) |
 | Google | `GoogleSearchProvider` | API Key + CX | [Custom Search JSON API](https://developers.google.com/custom-search/v1/overview) |
 | Mojeek | `MojeekSearchProvider` | API Key | [Mojeek Search API](https://www.mojeek.com/services/search/web-search-api/) |
 | SearchApi | `SearchApiProvider` | API Key (Bearer) | [SearchApi](https://www.searchapi.io/) |
 | Tavily | `TavilySearchProvider` | API Key | [Tavily](https://tavily.com/) |
+
+Every provider also has a constructor that takes your own `HttpClient` (for example one from `IHttpClientFactory`):
+
+```csharp
+var provider = new MojeekSearchProvider(new MojeekSearchOptions { ApiKey = "..." }, new HttpClient());
+```
+
+A provider you give an `HttpClient` uses it as is: the built-in rate limit handling below is not added, and the provider
+does not dispose it.
 
 ### Provider options
 
@@ -180,35 +216,47 @@ var provider = new SearchApiProvider(new SearchApiOptions { ApiKey = "...", Engi
 
 ## Rate Limiting
 
-Each provider handles rate limits automatically via a built-in `RateLimitHandler`:
+A provider that creates its own `HttpClient` (every constructor without an `HttpClient` parameter) handles HTTP 429
+responses itself:
 
-1. **Detection** — Monitors HTTP 429 status and `Retry-After` headers
-2. **Backoff** — Exponential backoff per provider (1s → 2s → 4s → max 30s)
-3. **Fallback** — When a provider is throttled, other providers continue serving results
-4. **Retry** — Up to 3 retries per request (default)
+1. **Detection** — an HTTP 429 response is retried; a `Retry-After` header (seconds or a date) sets the wait before the next attempt
+2. **Backoff** — otherwise the wait doubles per consecutive 429 from the same host: 1s → 2s → 4s …, at most 30s
+3. **Retry** — up to 3 retries per request; after that the provider sees the 429 as a failed request (`HttpRequestException`)
+4. **Fallback** — in a `WebSearchClient`, a provider that still fails contributes no results and the others' results are returned
+
+`WebSearchClient.SearchAsync` waits for every provider, so a throttled provider's retries delay the whole call. The
+`Retry-After` wait is taken as the server sends it; it is not capped at 30s.
 
 ## Dependency Injection
 
 ```csharp
+using Microsoft.Extensions.DependencyInjection;
+using WebLookup;
+
 services.AddWebLookup(options =>
 {
-    options.AddDuckDuckGo();              // No API key needed
-    options.AddDuckDuckGo("us-en");       // With optional region code
+    options.AddDuckDuckGo();              // No API key needed; or AddDuckDuckGo("us-en") for a region
     options.AddGoogle(g =>
     {
-        g.AddEngine(config["Google:ApiKey"], config["Google:Cx"]);
+        g.AddEngine("YOUR_GOOGLE_API_KEY", "YOUR_CX");  // AddEngine again to query several engines
     });
-    options.AddMojeek(config["Mojeek:ApiKey"]);
-    options.AddSearchApi(config["SearchApi:ApiKey"]);          // defaults to engine "google"
-    options.AddSearchApi(config["SearchApi:ApiKey"], "bing");  // specify engine
-    options.AddTavily(config["Tavily:ApiKey"]);
+    options.AddMojeek("YOUR_MOJEEK_API_KEY");
+    options.AddSearchApi("YOUR_SEARCHAPI_API_KEY");     // engine "google"; or AddSearchApi(key, "bing")
+    options.AddTavily("YOUR_TAVILY_API_KEY");
 });
 
 // Inject wherever needed
 public class MyService(WebSearchClient search, SiteExplorer explorer) { }
 ```
 
+`AddWebLookup` registers two singletons: `WebSearchClient` (with every provider added above, in that order) and
+`SiteExplorer`. The providers themselves are not registered as `ISearchProvider`; each `Add…` call adds one provider, so
+calling `AddDuckDuckGo()` twice queries DuckDuckGo twice. The API key arguments must be non-empty, and `AddGoogle` needs at
+least one `AddEngine`; otherwise the call throws.
+
 ## API Reference
+
+The blocks below show each type's public shape (checked against the library by the test suite).
 
 ### SearchResult
 
@@ -241,6 +289,9 @@ client.Options.MaxResultsPerProvider = 5;
 var results = await client.SearchAsync("query", new WebSearchOptions { MaxResultsPerProvider = 3 });
 ```
 
+`MaxResultsPerProvider` is passed to each provider as its `count`, so a merged result can hold up to that many results per
+provider before deduplication.
+
 ### ISearchProvider
 
 ```csharp
@@ -258,12 +309,13 @@ public interface ISearchProvider
 ```csharp
 public record RobotsInfo
 {
-    public IReadOnlyList<RobotsRule> Rules { get; init; }
-    public IReadOnlyList<string> Sitemaps { get; init; }
+    public IReadOnlyList<RobotsRule> Rules { get; init; } = [];
+    public IReadOnlyList<string> Sitemaps { get; init; } = [];
     public TimeSpan? CrawlDelay { get; init; }
-    public bool IsAllowed(string path, string userAgent = "*");
 }
 ```
+
+plus `bool IsAllowed(string path, string userAgent = "*")` — see [Filter URLs with robots.txt rules](#filter-urls-with-robotstxt-rules).
 
 ### SitemapEntry
 
@@ -280,7 +332,7 @@ public record SitemapEntry
 ## Requirements
 
 - .NET 10.0+
-- `Microsoft.Extensions.DependencyInjection.Abstractions` (for DI integration only)
+- `Microsoft.Extensions.DependencyInjection.Abstractions` (installed with the package; used by `AddWebLookup`)
 
 ## License
 
