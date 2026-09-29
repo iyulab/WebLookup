@@ -44,6 +44,28 @@ public class RobotsParserTests
     }
 
     [Fact]
+    public void Parse_StackedUserAgentLines_ShareTheGroupRules()
+    {
+        // RFC 9309 §2.1: consecutive user-agent lines open one group; its rules apply to every agent named.
+        var content = """
+            User-agent: BotA
+            User-agent: BotB
+            Disallow: /private/
+
+            User-agent: BotC
+            Disallow: /other/
+            """;
+
+        var result = RobotsParser.Parse(content);
+
+        Assert.False(result.IsAllowed("/private/page", userAgent: "BotA"));
+        Assert.False(result.IsAllowed("/private/page", userAgent: "BotB"));
+        Assert.True(result.IsAllowed("/private/page", userAgent: "BotC"));
+        Assert.False(result.IsAllowed("/other/page", userAgent: "BotC"));
+        Assert.True(result.IsAllowed("/other/page", userAgent: "BotA"));
+    }
+
+    [Fact]
     public void Parse_EmptyDisallow_IsIgnored()
     {
         var content = """

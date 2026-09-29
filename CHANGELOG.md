@@ -16,6 +16,9 @@ breaking changes, and each one is marked **Breaking** with a migration note.
   fastest; rate-limit retries apply only to a provider's own `HttpClient` and `Retry-After` is not capped; robots.txt
   answers other than 404 disallow everything; sitemap failures yield no entries; `StreamSitemapAsync` loads each file in
   full; the DI abstractions package is always a dependency.
+- **`robots.txt` rules now apply to every user agent of a group that names several.** In `User-agent: A` /
+  `User-agent: B` / `Disallow: /x`, only `B` received the rule, so `IsAllowed("/x", "A")` returned `true`. Consecutive
+  `User-agent` lines now open one group, as RFC 9309 specifies, and `Rules` holds one entry per agent named.
 
 ## [0.2.3] - 2026-09-17
 

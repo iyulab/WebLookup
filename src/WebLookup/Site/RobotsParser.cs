@@ -9,7 +9,9 @@ internal static class RobotsParser
         var rules = new List<RobotsRule>();
         var sitemaps = new List<string>();
         TimeSpan? crawlDelay = null;
-        var currentUserAgent = "*";
+        // RFC 9309 section 2.1: consecutive user-agent lines open one group, and its rules apply to every agent named.
+        var currentUserAgents = new List<string> { "*" };
+        var previousWasUserAgent = false;
 
         foreach (var rawLine in content.Split('\n'))
         {
@@ -35,28 +37,23 @@ internal static class RobotsParser
 
             if (directive.Equals("User-agent", StringComparison.OrdinalIgnoreCase))
             {
-                currentUserAgent = value;
+                if (!previousWasUserAgent)
+                    currentUserAgents = [];
+                currentUserAgents.Add(value);
+                previousWasUserAgent = true;
+                continue;
             }
-            else if (directive.Equals("Allow", StringComparison.OrdinalIgnoreCase))
+
+            previousWasUserAgent = false;
+
+            if (directive.Equals("Allow", StringComparison.OrdinalIgnoreCase))
             {
-                rules.Add(new RobotsRule
-                {
-                    UserAgent = currentUserAgent,
-                    Type = RobotsRuleType.Allow,
-                    Path = value
-                });
+                AddRules(rules, currentUserAgents, RobotsRuleType.Allow, value);
             }
             else if (directive.Equals("Disallow", StringComparison.OrdinalIgnoreCase))
             {
                 if (!string.IsNullOrEmpty(value))
-                {
-                    rules.Add(new RobotsRule
-                    {
-                        UserAgent = currentUserAgent,
-                        Type = RobotsRuleType.Disallow,
-                        Path = value
-                    });
-                }
+                    AddRules(rules, currentUserAgents, RobotsRuleType.Disallow, value);
             }
             else if (directive.Equals("Crawl-delay", StringComparison.OrdinalIgnoreCase))
             {
@@ -77,6 +74,12 @@ internal static class RobotsParser
             Sitemaps = sitemaps,
             CrawlDelay = crawlDelay
         };
+    }
+
+    private static void AddRules(List<RobotsRule> rules, List<string> userAgents, RobotsRuleType type, string path)
+    {
+        foreach (var userAgent in userAgents)
+            rules.Add(new RobotsRule { UserAgent = userAgent, Type = type, Path = path });
     }
 
     public static RobotsInfo AllowAll => new()
