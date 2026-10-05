@@ -10,7 +10,7 @@
     <PackageVersion Include="xunit.v3" Version="4.0.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="2.3.3" />
-    <PackageVersion Include="Iyu.Conventions.Testing" Version="0.3.0" />
+    <PackageVersion Include="Iyu.Conventions.Testing" Version="0.4.0" />
     <!-- Compiles the README's C# blocks against the current API -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
   </ItemGroup>
