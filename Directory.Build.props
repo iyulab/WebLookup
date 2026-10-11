@@ -8,6 +8,8 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
 <Version>0.3.0</Version>
+<!-- nuget.org «Release Notes»: the GitHub release of this version (its notes are the CHANGELOG section). -->
+<PackageReleaseNotes>https://github.com/iyulab/WebLookup/releases/tag/v$(Version)</PackageReleaseNotes>
     <Authors>iyulab</Authors>
     <RepositoryUrl>https://github.com/iyulab/WebLookup</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
