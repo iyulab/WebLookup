@@ -9,16 +9,25 @@ A lightweight .NET library for fast URL discovery across multiple search provide
 
 **WebLookup is a URL search engine, not a content parser.** It collects URLs and metadata (title, description) from search APIs and sitemaps, then hands them off to your crawler or parser of choice.
 
+## Packages
+
+| Package | Use |
+|---|---|
+| `WebLookup` | Multi-provider web search (`WebSearchClient`, `ISearchProvider`) and site exploration (`SiteExplorer`: robots.txt, sitemaps) |
+
 ## Features
 
-- **Multi-provider search** — DuckDuckGo (no API key), Google, Mojeek, SearchApi, Tavily
-- **Parallel execution** — `WebSearchClient` queries all of its providers at the same time
-- **Fallback** — a provider that throws (network error, rejected API key, rate limit still hit after its retries) contributes no results; the other providers' results are still returned. The failure itself is not reported.
-- **URL deduplication** — merges results across providers and removes duplicates
-- **Site exploration** — parse `robots.txt` rules and `sitemap.xml` files, including sitemap indexes and gzip
-- **Rate limit handling** — retries HTTP 429 with exponential backoff and honours `Retry-After` (when the provider creates its own `HttpClient`)
-- **Small footprint** — built on `System.Net.Http`, `System.Text.Json` and `System.Xml.Linq`; the one package dependency is `Microsoft.Extensions.DependencyInjection.Abstractions`
-- **DI-friendly** — `services.AddWebLookup(...)` registers `WebSearchClient` and `SiteExplorer`
+| Feature | Entry point | How to turn it on |
+|---|---|---|
+| Multi-provider search — DuckDuckGo (no API key), Google, Mojeek, SearchApi, Tavily | `DuckDuckGoSearchProvider`, `GoogleSearchProvider`, `MojeekSearchProvider`, `SearchApiProvider`, `TavilySearchProvider` (all `ISearchProvider.SearchAsync`) | Construct a provider with its options (API key where needed); or `AddDuckDuckGo()` / `AddGoogle(...)` / `AddMojeek(...)` / `AddSearchApi(...)` / `AddTavily(...)` inside `AddWebLookup` |
+| Parallel search + URL deduplication | `WebSearchClient.SearchAsync` | `new WebSearchClient(providers...)`, or inject it after `AddWebLookup`; `WebSearchOptions.MaxResultsPerProvider` (10) per client or per call |
+| Fallback — a failing provider contributes no results, the others are still returned (the failure is not reported) | `WebSearchClient` | Always on in `WebSearchClient`; a provider called directly throws |
+| Rate limit handling — retries HTTP 429 with exponential backoff, honours `Retry-After` | Built into each provider's own `HttpClient` | On when the provider creates its own `HttpClient`; off when you pass yours |
+| robots.txt (RFC 9309) | `SiteExplorer.GetRobotsAsync` → `RobotsInfo` (`Rules`, `Sitemaps`, `CrawlDelay`, `IsAllowed(path, userAgent)`) | `new SiteExplorer()`, or inject it after `AddWebLookup` |
+| Sitemaps, including sitemap indexes and gzip | `SiteExplorer.GetSitemapAsync` / `StreamSitemapAsync` → `SitemapEntry` | Same `SiteExplorer` |
+| Dependency injection | `services.AddWebLookup(options => ...)` | Registers `WebSearchClient` (with the providers you add) and `SiteExplorer` as singletons |
+
+Built on `System.Net.Http`, `System.Text.Json` and `System.Xml.Linq`; the one package dependency is `Microsoft.Extensions.DependencyInjection.Abstractions`.
 
 ## Installation
 
