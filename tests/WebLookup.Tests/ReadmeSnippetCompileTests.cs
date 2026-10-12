@@ -1,7 +1,6 @@
-using System.Collections.Immutable;
 using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
+using Iyu.Conventions.Testing.Snippets;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,92 +8,79 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace WebLookup.Tests;
 
 /// <summary>
-/// Compiles every <c>```csharp</c> block in README.md against the current assembly. A compiler checks the receiver, the
-/// arguments, the return types a block goes on to use, and the namespaces it needs.
+/// Compiles every C# block in README.md against the current assembly. A compiler checks the receiver, the arguments, the
+/// return types a block goes on to use, and the namespaces it needs.
 /// </summary>
 /// <remarks>
-/// A block is compiled as a top-level program: its <c>using</c> lines are hoisted, the common usings below are added, and
-/// the stand-ins below are declared when the block uses the name without declaring it — values a reader already has
-/// from the surrounding text (the service collection, a provider), not part of what the block shows.
+/// Each block is compiled as a top-level program by <see cref="SnippetCompiler"/>: its own usings, the implicit usings, the
+/// README's own using, and the stand-ins below when the block uses the name without declaring it — values a reader already
+/// has from the surrounding text (the service collection, a provider), not part of what the block shows.
 /// A block that only declares types is the API Reference's sketch of a library type: it compiles as a library, and each
 /// member it shows must exist on the real type with the same signature — a sketch compiles on its own whatever it says,
-/// so the compiler alone would not notice it drifting from the library.
+/// so the compiler alone would not notice it drifting from the library. That comparison is this repository's own check.
 /// </remarks>
 public class ReadmeSnippetCompileTests
 {
-    // A block that is deliberately not a program (a signature sketch, pseudocode) is listed here by the heading it sits
-    // under, with the reason. Shrink this, never grow it silently.
-    private static readonly Dictionary<string, string> Fragments = new(StringComparer.Ordinal);
+    // A block that is deliberately not a program (pseudocode), by the heading it sits under, with the reason. Shrink this,
+    // never grow it silently.
+    private static readonly SnippetRoster Fragments = new(new Dictionary<string, string>(StringComparer.Ordinal));
 
     // The implicit usings of an SDK console project (ImplicitUsings=enable).
-    private const string CommonUsings = """
-        using System;
-        using System.Collections.Generic;
-        using System.IO;
-        using System.Linq;
-        using System.Net.Http;
-        using System.Threading;
-        using System.Threading.Tasks;
-        """;
+    private static readonly string[] CommonUsings =
+        ["System", "System.Collections.Generic", "System.IO", "System.Linq", "System.Net.Http", "System.Threading", "System.Threading.Tasks"];
 
     // The README reads as one guide: its Quick Start states this using once, and every later block assumes it.
     // ReadmeUsings_AreTheOnesTheQuickStartStates keeps this list and the README's statement the same.
     private static readonly string[] ReadmeUsings = ["WebLookup"];
 
-    private static readonly (string Name, string Declaration)[] StandIns =
-    [
-        ("services", "Microsoft.Extensions.DependencyInjection.IServiceCollection services = null!;"),
+    private static readonly Dictionary<string, string> StandIns = new(StringComparer.Ordinal)
+    {
+        ["services"] = "Microsoft.Extensions.DependencyInjection.IServiceCollection services = null!;",
         // The "Filter URLs" block continues the "Explore a site" block.
-        ("explorer", "WebLookup.SiteExplorer explorer = new();"),
+        ["explorer"] = "WebLookup.SiteExplorer explorer = new();",
         // The WebSearchOptions block configures a client over a provider built earlier.
-        ("provider", "WebLookup.ISearchProvider provider = null!;"),
-    ];
+        ["provider"] = "WebLookup.ISearchProvider provider = null!;",
+    };
 
-    private static readonly string[] AssembliesToLoad =
-    [
-        "WebLookup",
-        "Microsoft.Extensions.DependencyInjection", "Microsoft.Extensions.DependencyInjection.Abstractions",
-    ];
+    private static readonly IReadOnlyList<MetadataReference> References = SnippetCompiler.ReferencesFor(
+        typeof(WebSearchClient).Assembly,
+        Assembly.Load("Microsoft.Extensions.DependencyInjection"),
+        Assembly.Load("Microsoft.Extensions.DependencyInjection.Abstractions"));
+
+    private static readonly SnippetCompiler Compiler = new(References)
+    {
+        Usings = [.. CommonUsings, .. ReadmeUsings],
+        StandIns = StandIns,
+    };
+
+    private static readonly IReadOnlyList<DocSnippet> Snippets = DocSnippets.Read(Path.Combine(RepoRoot(), "README.md"), "README.md");
 
     private static readonly SymbolDisplayFormat SignatureFormat = SymbolDisplayFormat.FullyQualifiedFormat
         .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
-    public static TheoryData<string> Blocks()
-    {
-        var data = new TheoryData<string>();
-        foreach (var block in ReadBlocks())
-            data.Add(block.Key);
-        return data;
-    }
+    public static TheoryData<string> Blocks() => new(Snippets.Select(s => s.Key));
 
     [Theory]
     [MemberData(nameof(Blocks))]
     public void ReadmeBlock_Compiles(string key)
     {
-        var block = ReadBlocks().Single(b => b.Key == key);
-        if (Fragments.ContainsKey(block.Heading))
+        var snippet = Snippets.Single(s => s.Key == key);
+        if (Fragments.IsFragment(snippet))
             return;
 
-        var errors = Check(block.Code);
+        var errors = Check(snippet.Code);
 
         Assert.True(errors.Count == 0,
-            $"README block {key} does not match the current API:\n" +
-            string.Join("\n", errors) + "\n--- source ---\n" + Program(block.Code));
+            $"{key} does not match the current API:\n" + string.Join("\n", errors) + "\n--- compiled as ---\n" + Compiler.Program(snippet.Code));
     }
 
     [Fact]
-    public void EveryReadmeBlock_IsFoundAndFragmentsNameRealHeadings()
-    {
-        var blocks = ReadBlocks();
-        Assert.True(blocks.Count >= 16, $"expected the README's C# blocks, found {blocks.Count}");
-        Assert.All(Fragments.Keys, heading => Assert.Contains(blocks, b => b.Heading == heading));
-    }
+    public void EveryReadmeBlock_IsFoundAndFragmentsNameRealHeadings() => Fragments.ShouldMatch([.. Snippets], atLeast: 16);
 
     [Fact]
     public void ReadmeUsings_AreTheOnesTheQuickStartStates()
     {
-        var quickStart = ReadBlocks()[0];
-        var stated = quickStart.Code.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n')
+        var stated = Snippets[0].Code.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n')
             .Select(l => Regex.Match(l, @"^using ([\w.]+);"))
             .Where(m => m.Success)
             .Select(m => m.Groups[1].Value);
@@ -157,71 +143,21 @@ public class ReadmeSnippetCompileTests
         Assert.Contains(errors, e => e.Contains("SearchResponse", StringComparison.Ordinal));
     }
 
-    private sealed record Block(string Key, string Heading, string Code);
-
-    private static List<Block> ReadBlocks()
-    {
-        var lines = File.ReadAllText(Path.Combine(RepoRoot(), "README.md"))
-            .Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        var blocks = new List<Block>();
-        var heading = "(top)";
-        for (var i = 0; i < lines.Length; i++)
-        {
-            if (lines[i].StartsWith('#'))
-                heading = lines[i].TrimStart('#').Trim();
-            if (lines[i].Trim() != "```csharp")
-                continue;
-
-            var start = i + 1;
-            var code = new StringBuilder();
-            for (i++; i < lines.Length && lines[i].Trim() != "```"; i++)
-                code.AppendLine(lines[i]);
-            blocks.Add(new Block($"README.md line {start}: {heading}", heading, code.ToString()));
-        }
-
-        return blocks;
-    }
-
-    private static string Program(string code)
-    {
-        var lines = code.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        static string Code(string l) => l.Split("//", 2)[0].TrimEnd();
-        static bool IsUsingDirective(string l) =>
-            l.StartsWith("using ", StringComparison.Ordinal) && Code(l).EndsWith(';') && !l.StartsWith("using var ", StringComparison.Ordinal);
-
-        var body = string.Join("\n", lines.Where(l => !IsUsingDirective(l)));
-        var standIns = StandIns
-            .Where(s => Regex.IsMatch(body, $@"\b{s.Name}\b")
-                        && !Regex.IsMatch(body, $@"\b(var|[A-Z][\w<>?,\s]*)\s+{s.Name}\s*[=;]"))
-            .Select(s => s.Declaration);
-
-        // A block that states a using the README already assumes must not get it twice.
-        var stated = lines.Where(IsUsingDirective).Select(Code).ToHashSet(StringComparer.Ordinal);
-        var assumed = ReadmeUsings.Select(n => $"using {n};").Where(u => !stated.Contains(u));
-
-        return string.Join("\n", stated) + "\n" + CommonUsings + "\n"
-               + string.Join("\n", assumed) + "\n"
-               + string.Join("\n", standIns) + "\n" + body;
-    }
-
+    // The kit compiles; a block that compiled and only declares types is then compared with the library's types.
     private static List<string> Check(string code)
     {
-        var tree = CSharpSyntaxTree.ParseText(Program(code), new CSharpParseOptions(LanguageVersion.Latest));
-        // A block that only declares types is a sketch of a library type, not a program.
-        var isSketch = !tree.GetRoot().DescendantNodes().OfType<GlobalStatementSyntax>().Any();
-        var compilation = CSharpCompilation.Create(
-            "ReadmeSnippet", [tree], References(),
-            new CSharpCompilationOptions(
-                isSketch ? OutputKind.DynamicallyLinkedLibrary : OutputKind.ConsoleApplication,
-                nullableContextOptions: NullableContextOptions.Enable));
+        var errors = Compiler.Compile(code).Select(d => d.ToString()).ToList();
+        if (errors.Count > 0)
+            return errors;
 
-        var errors = compilation.GetDiagnostics()
-            .Where(d => d.Severity == DiagnosticSeverity.Error)
-            .Select(d => d.ToString())
-            .ToList();
-        if (errors.Count == 0 && isSketch)
-            errors.AddRange(SketchMismatches(compilation, tree));
-        return errors;
+        var tree = CSharpSyntaxTree.ParseText(Compiler.Program(code), new CSharpParseOptions(LanguageVersion.Latest));
+        if (tree.GetRoot().DescendantNodes().OfType<GlobalStatementSyntax>().Any())
+            return errors;
+
+        var compilation = CSharpCompilation.Create(
+            "ReadmeSketch", [tree], References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
+        return [.. SketchMismatches(compilation, tree)];
     }
 
     // Each type the sketch declares must be a type the library exports, and each public member it shows must exist on
@@ -275,20 +211,6 @@ public class ReadmeSnippetCompileTests
             + ")",
         _ => null,
     };
-
-    private static List<MetadataReference> References()
-    {
-        foreach (var name in AssembliesToLoad)
-            Assembly.Load(name);
-
-        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is string trusted)
-            paths.UnionWith(trusted.Split(Path.PathSeparator).Where(p => p.Length > 0));
-        paths.UnionWith(AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic && a.Location.Length > 0)
-            .Select(a => a.Location));
-        return paths.Select(p => (MetadataReference)MetadataReference.CreateFromFile(p)).ToList();
-    }
 
     private static string RepoRoot()
     {
