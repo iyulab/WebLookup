@@ -2,8 +2,6 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Iyu.Conventions.Testing.Snippets;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace WebLookup.Tests;
 
@@ -15,9 +13,11 @@ namespace WebLookup.Tests;
 /// Each block is compiled as a top-level program by <see cref="SnippetCompiler"/>: its own usings, the implicit usings, the
 /// README's own using, and the stand-ins below when the block uses the name without declaring it — values a reader already
 /// has from the surrounding text (the service collection, a provider), not part of what the block shows.
-/// A block that only declares types is the API Reference's sketch of a library type: it compiles as a library, and each
-/// member it shows must exist on the real type with the same signature — a sketch compiles on its own whatever it says,
-/// so the compiler alone would not notice it drifting from the library. That comparison is this repository's own check.
+/// A block that only declares types is the API Reference's listing of a library type. It is not compiled — compiled, it
+/// would declare a second type of that name and check nothing — but compared with the real type
+/// (<see cref="SnippetCompiler.CheckListings"/>): each member it shows must exist with the same signature, accessors and
+/// parameter names, and the type must be one the library exports, of the same kind (<see cref="SnippetCompiler.StrictListings"/>:
+/// every type-only block in this README is an API reference).
 /// </remarks>
 public class ReadmeSnippetCompileTests
 {
@@ -51,12 +51,11 @@ public class ReadmeSnippetCompileTests
     {
         Usings = [.. CommonUsings, .. ReadmeUsings],
         StandIns = StandIns,
+        CheckListings = true,
+        StrictListings = true,
     };
 
     private static readonly IReadOnlyList<DocSnippet> Snippets = DocSnippets.Read(Path.Combine(RepoRoot(), "README.md"), "README.md");
-
-    private static readonly SymbolDisplayFormat SignatureFormat = SymbolDisplayFormat.FullyQualifiedFormat
-        .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     public static TheoryData<string> Blocks() => new(Snippets.Select(s => s.Key));
 
@@ -68,7 +67,7 @@ public class ReadmeSnippetCompileTests
         if (Fragments.IsFragment(snippet))
             return;
 
-        var errors = Check(snippet.Code);
+        var errors = Compiler.Compile(snippet.Code);
 
         Assert.True(errors.Count == 0,
             $"{key} does not match the current API:\n" + string.Join("\n", errors) + "\n--- compiled as ---\n" + Compiler.Program(snippet.Code));
@@ -76,6 +75,18 @@ public class ReadmeSnippetCompileTests
 
     [Fact]
     public void EveryReadmeBlock_IsFoundAndFragmentsNameRealHeadings() => Fragments.ShouldMatch([.. Snippets], atLeast: 16);
+
+    /// <summary>
+    /// The API Reference's listings are recognised as listings (and so compared with the real types), not compiled as the
+    /// reader's own types — a floor, so a listing the checker stops recognising shows here.
+    /// </summary>
+    [Fact]
+    public void ApiReferenceListings_AreCheckedAgainstTheRealTypes()
+    {
+        var document = Compiler.CompileDocument([.. Snippets]);
+
+        Assert.True(document.ListedTypes >= 5, $"expected the API Reference's five listings to be checked, found {document.ListedTypes}");
+    }
 
     [Fact]
     public void ReadmeUsings_AreTheOnesTheQuickStartStates()
@@ -92,7 +103,7 @@ public class ReadmeSnippetCompileTests
     [Fact]
     public void Compile_RejectsAMethodTheLibraryDoesNotHave()
     {
-        var errors = Check("""
+        var errors = Compiler.Compile("""
             var client = new WebSearchClient();
             await client.SearchAllTheThingsAsync("query");
             """);
@@ -100,11 +111,11 @@ public class ReadmeSnippetCompileTests
         Assert.NotEmpty(errors);
     }
 
-    /// <summary>Positive control: a type sketch that shows a member the real type does not have is rejected.</summary>
+    /// <summary>Positive control: a listing that shows a member the real type does not have is rejected.</summary>
     [Fact]
-    public void Sketch_RejectsAMemberTheTypeDoesNotHave()
+    public void Listing_RejectsAMemberTheTypeDoesNotHave()
     {
-        var errors = Check("""
+        var errors = Compiler.Compile("""
             public record SearchResult
             {
                 public required string Url { get; init; }
@@ -112,105 +123,50 @@ public class ReadmeSnippetCompileTests
             }
             """);
 
-        Assert.Contains(errors, e => e.Contains("Score", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.Id == "LISTING001" && e.GetMessage(System.Globalization.CultureInfo.InvariantCulture).Contains("Score", StringComparison.Ordinal));
     }
 
-    /// <summary>Positive control: a type sketch that shows a member with the wrong signature is rejected.</summary>
+    /// <summary>Positive control: a listing that shows a member with other accessors is rejected (the option is settable).</summary>
     [Fact]
-    public void Sketch_RejectsAMemberWithAnotherSignature()
+    public void Listing_RejectsAMemberWithAnotherSignature()
     {
-        var errors = Check("""
+        var errors = Compiler.Compile("""
             public class WebSearchOptions
             {
                 public int MaxResultsPerProvider { get; init; } = 10;
             }
             """);
 
-        Assert.Contains(errors, e => e.Contains("MaxResultsPerProvider", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.Id == "LISTING002" && e.GetMessage(System.Globalization.CultureInfo.InvariantCulture).Contains("MaxResultsPerProvider", StringComparison.Ordinal));
     }
 
-    /// <summary>Positive control: a type sketch of a type the library does not export is rejected.</summary>
+    /// <summary>Positive control: a listing of a type the library does not export is rejected.</summary>
     [Fact]
-    public void Sketch_RejectsATypeTheLibraryDoesNotExport()
+    public void Listing_RejectsATypeTheLibraryDoesNotExport()
     {
-        var errors = Check("""
+        var errors = Compiler.Compile("""
             public record SearchResponse
             {
                 public string? Url { get; init; }
             }
             """);
 
-        Assert.Contains(errors, e => e.Contains("SearchResponse", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.Id == "LISTING004" && e.GetMessage(System.Globalization.CultureInfo.InvariantCulture).Contains("SearchResponse", StringComparison.Ordinal));
     }
 
-    // The kit compiles; a block that compiled and only declares types is then compared with the library's types.
-    private static List<string> Check(string code)
+    /// <summary>Positive control: a listing that calls a record a class is rejected.</summary>
+    [Fact]
+    public void Listing_RejectsATypeOfAnotherKind()
     {
-        var errors = Compiler.Compile(code).Select(d => d.ToString()).ToList();
-        if (errors.Count > 0)
-            return errors;
-
-        var tree = CSharpSyntaxTree.ParseText(Compiler.Program(code), new CSharpParseOptions(LanguageVersion.Latest));
-        if (tree.GetRoot().DescendantNodes().OfType<GlobalStatementSyntax>().Any())
-            return errors;
-
-        var compilation = CSharpCompilation.Create(
-            "ReadmeSketch", [tree], References,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
-        return [.. SketchMismatches(compilation, tree)];
-    }
-
-    // Each type the sketch declares must be a type the library exports, and each public member it shows must exist on
-    // that type with the same signature. A sketch may leave members out; it may not show ones that are not there.
-    private static IEnumerable<string> SketchMismatches(CSharpCompilation compilation, SyntaxTree tree)
-    {
-        var model = compilation.GetSemanticModel(tree);
-        foreach (var declaration in tree.GetRoot().DescendantNodes().OfType<BaseTypeDeclarationSyntax>())
-        {
-            if (model.GetDeclaredSymbol(declaration) is not INamedTypeSymbol sketch)
-                continue;
-
-            var real = compilation.GetTypeByMetadataName($"WebLookup.{sketch.MetadataName}");
-            if (real is null || real.DeclaredAccessibility != Accessibility.Public)
+        var errors = Compiler.Compile("""
+            public class SearchResult
             {
-                yield return $"the sketch declares {sketch.Name}, which the library does not export";
-                continue;
+                public required string Url { get; init; }
             }
+            """);
 
-            if (sketch.TypeKind != real.TypeKind || sketch.IsRecord != real.IsRecord)
-                yield return $"{sketch.Name}: the sketch is a {Kind(sketch)}, the library's type is a {Kind(real)}";
-
-            foreach (var member in sketch.GetMembers().Where(m => !m.IsImplicitlyDeclared && m.DeclaredAccessibility == Accessibility.Public))
-            {
-                var signature = Signature(member);
-                if (signature is null)
-                    continue;
-
-                var actual = real.GetMembers(member.Name).Select(Signature).OfType<string>().ToList();
-                if (!actual.Contains(signature, StringComparer.Ordinal))
-                {
-                    yield return actual.Count == 0
-                        ? $"{sketch.Name}.{member.Name}: the library's type has no such member"
-                        : $"{sketch.Name}.{member.Name}: the sketch shows `{signature}`, the library has `{string.Join("` / `", actual)}`";
-                }
-            }
-        }
+        Assert.Contains(errors, e => e.Id == "LISTING004");
     }
-
-    private static string Kind(INamedTypeSymbol type) => type.IsRecord ? "record" : type.TypeKind.ToString().ToLowerInvariant();
-
-    private static string? Signature(ISymbol member) => member switch
-    {
-        IPropertySymbol p => $"{(p.IsRequired ? "required " : "")}{p.Type.ToDisplayString(SignatureFormat)} {p.Name} {{ "
-                             + (p.GetMethod is null ? "" : "get; ")
-                             + (p.SetMethod is null ? "" : p.SetMethod.IsInitOnly ? "init; " : "set; ") + "}",
-        IMethodSymbol { MethodKind: MethodKind.Ordinary } m =>
-            $"{m.ReturnType.ToDisplayString(SignatureFormat)} {m.Name}("
-            + string.Join(", ", m.Parameters.Select(p => p.Type.ToDisplayString(SignatureFormat) + " " + p.Name
-                                                         + (p.HasExplicitDefaultValue ? " = " + (p.ExplicitDefaultValue ?? "default") : "")))
-            + ")",
-        _ => null,
-    };
 
     private static string RepoRoot()
     {
