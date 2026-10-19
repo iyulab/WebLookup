@@ -12,6 +12,7 @@
 <PackageReleaseNotes>https://github.com/iyulab/WebLookup/releases/tag/v$(Version)</PackageReleaseNotes>
     <Authors>iyulab</Authors>
     <RepositoryUrl>https://github.com/iyulab/WebLookup</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/iyulab/WebLookup</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
   <!-- Ship the XML documentation with the package: without this the nupkg
