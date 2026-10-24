@@ -28,4 +28,9 @@
     </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
+  <!-- MIT asks that the notice travel with the code: ship the LICENSE text inside the package -->
+  <ItemGroup Condition="$(MSBuildProjectDirectory.Contains('\src\')) OR $(MSBuildProjectDirectory.Contains('/src/'))">
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="\" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)LICENSE')" />
+  </ItemGroup>
+
 </Project>
