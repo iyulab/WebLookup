@@ -12,6 +12,9 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 ### Changed
 - **The nuget.org «Release Notes» of every package link to the GitHub release of its version**, whose notes are this CHANGELOG's section for that version.
 
+### Dependencies
+- `Microsoft.Extensions.DependencyInjection(.Abstractions)` 10.0.8 -> 10.0.13.
+
 ## [0.3.0] - 2026-09-30
 
 ### Changed
