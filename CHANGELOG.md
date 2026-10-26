@@ -15,6 +15,7 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 
 ### Dependencies
 - `Microsoft.Extensions.DependencyInjection(.Abstractions)` 10.0.8 -> 10.0.13.
+- Re-pinned third-party packages: 2 .NET servicing pins (Microsoft.Extensions) 10.0.13 -> 10.0.14 (the 10.0.14 security servicing release).
 
 ## [0.3.0] - 2026-09-30
 
