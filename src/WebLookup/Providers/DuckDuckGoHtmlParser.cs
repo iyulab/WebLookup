@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 
 namespace WebLookup;
@@ -15,12 +16,12 @@ internal static partial class DuckDuckGoHtmlParser
             if (!linkMatch.Success)
                 continue;
 
-            var rawHref = linkMatch.Groups[1].Value;
+            var rawHref = WebUtility.HtmlDecode(linkMatch.Groups[1].Value);
             var url = DecodeUrl(rawHref);
             if (url is null)
                 continue;
 
-            var title = StripHtmlTags(linkMatch.Groups[2].Value).Trim();
+            var title = WebUtility.HtmlDecode(StripHtmlTags(linkMatch.Groups[2].Value)).Trim();
             if (string.IsNullOrEmpty(title))
                 continue;
 
@@ -28,7 +29,7 @@ internal static partial class DuckDuckGoHtmlParser
             var snippetMatch = SnippetRegex().Match(block.Value);
             if (snippetMatch.Success)
             {
-                description = StripHtmlTags(snippetMatch.Groups[1].Value).Trim();
+                description = WebUtility.HtmlDecode(StripHtmlTags(snippetMatch.Groups[1].Value)).Trim();
                 if (string.IsNullOrEmpty(description))
                     description = null;
             }
@@ -44,6 +45,14 @@ internal static partial class DuckDuckGoHtmlParser
 
         return results;
     }
+
+    /// <summary>
+    /// True when <paramref name="html"/> is DuckDuckGo's challenge page (the "anomaly" dialog it shows a client it takes
+    /// for a bot) rather than a results page.
+    /// </summary>
+    internal static bool IsChallengePage(string html) =>
+        html.Contains("anomaly-modal", StringComparison.OrdinalIgnoreCase)
+        || html.Contains("bots use DuckDuckGo", StringComparison.OrdinalIgnoreCase);
 
     internal static string? DecodeUrl(string rawHref)
     {

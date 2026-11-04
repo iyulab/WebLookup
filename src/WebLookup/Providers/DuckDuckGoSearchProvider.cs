@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace WebLookup;
 
 public sealed class DuckDuckGoSearchProvider : SearchProviderBase
@@ -51,6 +53,17 @@ public sealed class DuckDuckGoSearchProvider : SearchProviderBase
 
         var html = await response.Content.ReadAsStringAsync(cancellationToken);
         var results = DuckDuckGoHtmlParser.Parse(html);
+
+        // DuckDuckGo answers a search it takes for automated with a challenge page (HTTP 202, or a page with an "anomaly"
+        // dialog) instead of results. That is a refused search, like a 403 or a 429, not a search with no hits.
+        if (results.Count == 0 && (response.StatusCode == HttpStatusCode.Accepted || DuckDuckGoHtmlParser.IsChallengePage(html)))
+        {
+            throw new HttpRequestException(
+                "DuckDuckGo answered with its bot-challenge page instead of results, so the search was blocked. "
+                + "Try again later, or use a provider that takes an API key.",
+                inner: null,
+                response.StatusCode);
+        }
 
         return results.Count <= count
             ? results

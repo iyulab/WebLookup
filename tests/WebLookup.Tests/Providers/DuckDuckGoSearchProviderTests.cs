@@ -226,4 +226,81 @@ public class DuckDuckGoSearchProviderTests
 
         Assert.Equal("https://html.duckduckgo.com/", referer);
     }
+
+    // DuckDuckGo answers a search it takes for automated with a challenge page instead of results. That is a refused search -
+    // like a 403 or a 429, which throw - not a search with no hits.
+    private const string ChallengePage = """
+        <html><body><div class="anomaly-modal__modal"><div class="anomaly-modal__title">Unfortunately, bots use DuckDuckGo too.</div>
+        <p>Please complete the following challenge to confirm this search was made by a human.</p></div></body></html>
+        """;
+
+    private static DuckDuckGoSearchProvider ProviderFor(System.Net.HttpStatusCode status, string html) =>
+        new(new DuckDuckGoSearchOptions(), new HttpClient(new MockHttpHandler(_ => Task.FromResult(new HttpResponseMessage(status)
+        {
+            Content = new StringContent(html)
+        }))));
+
+    [Fact]
+    public async Task SearchAsync_Http202ChallengePage_Throws()
+    {
+        var provider = ProviderFor(System.Net.HttpStatusCode.Accepted, ChallengePage);
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(
+            () => provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(System.Net.HttpStatusCode.Accepted, ex.StatusCode);
+        Assert.Contains("challenge", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SearchAsync_Http202WithNoMarkerAndNoResults_Throws()
+    {
+        var provider = ProviderFor(System.Net.HttpStatusCode.Accepted, "<html><body>Please wait</body></html>");
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task SearchAsync_Http200PageWithTheAnomalyDialogAndNoResults_Throws()
+    {
+        var provider = ProviderFor(System.Net.HttpStatusCode.OK, ChallengePage);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task SearchAsync_AnOrdinaryPageWithNoHits_ReturnsAnEmptyList()
+    {
+        var provider = ProviderFor(System.Net.HttpStatusCode.OK, "<html><body><div class=\"no-results\">No results.</div></body></html>");
+
+        var results = await provider.SearchAsync("zzqx", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task SearchAsync_ResultsThatMentionBotsInTheirText_AreNotAChallenge()
+    {
+        var html = MakeHtml(("https://example.com/1", "Why bots use DuckDuckGo", "an article about it"));
+        var provider = ProviderFor(System.Net.HttpStatusCode.OK, html);
+
+        var results = await provider.SearchAsync("bots", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Single(results);
+    }
+
+    [Fact]
+    public async Task SearchAsync_DecodesHtmlEntitiesInTitleAndSnippet()
+    {
+        var html = MakeHtml(("https://example.com/1", "Title 1 &amp; &#54620;&#44397;&#50612; &#39;q&#39;", "Snippet 1 &quot;text&quot; &lt;b&gt;"));
+        var provider = ProviderFor(System.Net.HttpStatusCode.OK, html);
+
+        var results = await provider.SearchAsync("test", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal("Title 1 & 한국어 'q'", results[0].Title);
+        Assert.Equal("Snippet 1 \"text\" <b>", results[0].Description);
+    }
+
 }

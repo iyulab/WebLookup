@@ -21,7 +21,7 @@ A lightweight .NET library for fast URL discovery across multiple search provide
 |---|---|---|
 | Multi-provider search — DuckDuckGo (no API key), Google, Mojeek, SearchApi, Tavily | `DuckDuckGoSearchProvider`, `GoogleSearchProvider`, `MojeekSearchProvider`, `SearchApiProvider`, `TavilySearchProvider` (all `ISearchProvider.SearchAsync`) | Construct a provider with its options (API key where needed); or `AddDuckDuckGo()` / `AddGoogle(...)` / `AddMojeek(...)` / `AddSearchApi(...)` / `AddTavily(...)` inside `AddWebLookup` |
 | Parallel search + URL deduplication | `WebSearchClient.SearchAsync` | `new WebSearchClient(providers...)`, or inject it after `AddWebLookup`; `WebSearchOptions.MaxResultsPerProvider` (10) per client or per call |
-| Fallback — a failing provider contributes no results, the others are still returned (the failure is not reported) | `WebSearchClient` | Always on in `WebSearchClient`; a provider called directly throws |
+| Fallback — a failing provider contributes no results, the others are still returned (the failure is not reported; if all fail the call throws) | `WebSearchClient` | Always on in `WebSearchClient` while at least one provider answers; a provider called directly throws |
 | Rate limit handling — retries HTTP 429 with exponential backoff, honours `Retry-After` | Built into each provider's own `HttpClient` | On when the provider creates its own `HttpClient`; off when you pass yours |
 | robots.txt (RFC 9309) | `SiteExplorer.GetRobotsAsync` → `RobotsInfo` (`Rules`, `Sitemaps`, `CrawlDelay`, `IsAllowed(path, userAgent)`) | `new SiteExplorer()`, or inject it after `AddWebLookup` |
 | Sitemaps, including sitemap indexes and gzip | `SiteExplorer.GetSitemapAsync` / `StreamSitemapAsync` → `SitemapEntry` | Same `SiteExplorer` |
@@ -72,7 +72,9 @@ foreach (var item in results)
 
 Providers run in parallel and `SearchAsync` returns once every provider has answered or failed. A provider that throws
 contributes no results, so a rate-limited or misconfigured provider does not stop the others — and does not raise an
-error either: an empty or short list can mean a provider failed. Disposing the client disposes its providers.
+error either: a short list can mean a provider failed. When **every** provider fails the call throws (the provider's own
+exception when there is one provider, an `AggregateException` of all of them otherwise), so a blocked or misconfigured
+search is not mistaken for a search with no hits. Disposing the client disposes its providers.
 
 ### Response format
 
@@ -133,8 +135,11 @@ var results = await tavily.SearchAsync("query", count: 5);
 ```
 
 A single provider called directly **does** throw on failure (`HttpRequestException` for a rejected key or an HTTP error);
-only `WebSearchClient` turns a failure into an empty contribution. The exception is `GoogleSearchProvider`, which skips a
-failing engine and so returns an empty list when its only engine fails.
+only `WebSearchClient` turns one provider's failure into an empty contribution (and throws when none answers). The
+exception is `GoogleSearchProvider`, which skips a failing engine and so returns an empty list when its only engine fails.
+`DuckDuckGoSearchProvider` needs no key but is a scraped page: when DuckDuckGo takes a client for a bot and answers with its
+challenge page (HTTP 202), the search throws `HttpRequestException` instead of returning an empty list; heavy or repeated
+use can trigger it.
 
 ### Explore a site
 

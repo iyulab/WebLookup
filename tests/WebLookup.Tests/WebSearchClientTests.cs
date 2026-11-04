@@ -165,4 +165,55 @@ public class WebSearchClientTests
             return Task.FromResult(_results ?? (IReadOnlyList<SearchResult>)[]);
         }
     }
+
+    // One provider failing leaves the others' results; none answering is a failed search, not a search with no hits.
+    [Fact]
+    public async Task SearchAsync_TheOnlyProviderFails_Throws()
+    {
+        var client = new WebSearchClient(new FakeProvider("Only", null, shouldThrow: true));
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.SearchAsync("test", TestContext.Current.CancellationToken));
+
+        Assert.Equal("Provider failed", ex.Message);
+    }
+
+    [Fact]
+    public async Task SearchAsync_EveryProviderFails_ThrowsAnAggregateOfAll()
+    {
+        var client = new WebSearchClient(
+            new FakeProvider("A", null, shouldThrow: true),
+            new FakeProvider("B", null, shouldThrow: true));
+
+        var ex = await Assert.ThrowsAsync<AggregateException>(
+            () => client.SearchAsync("test", TestContext.Current.CancellationToken));
+
+        Assert.Equal(2, ex.InnerExceptions.Count);
+    }
+
+    [Fact]
+    public async Task SearchAsync_AProviderThatAnswersWithNoHits_IsNotAFailure()
+    {
+        var client = new WebSearchClient(
+            new FakeProvider("Empty", []),
+            new FakeProvider("Failing", null, shouldThrow: true));
+
+        var results = await client.SearchAsync("test", TestContext.Current.CancellationToken);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task SearchAsync_AProviderTimeout_IsThatProviderFailing_NotTheCallerCancelling()
+    {
+        // A provider's HttpClient.Timeout surfaces as an OperationCanceledException while the caller's token is not cancelled.
+        var client = new WebSearchClient(
+            new FakeProvider("TimedOut", null, shouldCancel: true),
+            new FakeProvider("Working", [new SearchResult { Url = "https://example.com/ok", Title = "OK", Provider = "Working" }]));
+
+        var results = await client.SearchAsync("test", TestContext.Current.CancellationToken);
+
+        Assert.Single(results);
+    }
+
 }
