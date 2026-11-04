@@ -1,8 +1,9 @@
 # Shared corpus of robots.txt questions (RFC 9309), kept byte for byte in the WebFlux and WebLookup tests.
 # One row = one question: robots.txt body (\n and \r are escapes), the crawler name, the URL path (with query), and what RFC 9309 answers.
 # `webflux` / `weblookup`: `=` means the implementation gives the RFC answer; `allow` or `disallow` is the answer it gives instead;
-# `defect` means its answer is wrong today (the test pins what it answers now, the row is a to-do). A row that differs from the RFC carries a note:
-# `choice:` (on purpose) or `defect:` (to fix). Change both copies together: scripts/check-shared-copies.ps1 in the umbrella fails when they differ.
+# `defect` means its answer is wrong today (the test pins what it answers now, so fixing it turns the row red until it is changed to `=`).
+# A row that differs from the RFC carries a note: `choice:` (on purpose) or `defect:` (to fix).
+# Change both copies together: scripts/check-shared-copies.ps1 in the umbrella fails when they differ.
 id	robots	agent	path	expected	webflux	weblookup	note
 prefix-hit	User-agent: *\nDisallow: /private	Bot	/private	disallow	=	=	
 prefix-deeper	User-agent: *\nDisallow: /private	Bot	/private/x	disallow	=	=	
@@ -23,7 +24,7 @@ dollar-exact-hit	User-agent: *\nDisallow: /a$	Bot	/a	disallow	=	=
 dollar-exact-longer-path	User-agent: *\nDisallow: /a$	Bot	/a/b	allow	=	=	
 dollar-exact-text-after	User-agent: *\nDisallow: /a$	Bot	/ab	allow	=	=	
 anchored-wildcard-simple	User-agent: *\nDisallow: /*.php$	Bot	/a.php	disallow	=	=	
-anchored-wildcard-repeated-piece	User-agent: *\nDisallow: /*.php$	Bot	/a.php.php	disallow	=	=	the star may cover a.php: the last piece sits at the end (was wrong in WebLookup until this release)
+anchored-wildcard-repeated-piece	User-agent: *\nDisallow: /*.php$	Bot	/a.php.php	disallow	=	=	the star may cover a.php: the last piece sits at the end
 anchored-wildcard-query-follows	User-agent: *\nDisallow: /*.php$	Bot	/a.php?x=1	allow	=	=	the query is part of what is matched
 anchored-two-stars	User-agent: *\nDisallow: /*a*b$	Bot	/xabab	disallow	=	=	
 anchored-star-tail	User-agent: *\nDisallow: /x*$	Bot	/xyz	disallow	=	=	
@@ -45,11 +46,14 @@ repeated-agent-merges-first	User-agent: A\nDisallow: /a\n\nUser-agent: A\nDisall
 repeated-agent-merges-second	User-agent: A\nDisallow: /a\n\nUser-agent: A\nDisallow: /b	A	/b	disallow	=	=	
 reserved-escape-kept	User-agent: *\nDisallow: /a%2Fb	Bot	/a%2Fb	disallow	=	=	an escaped reserved character is compared as written
 reserved-escape-is-not-a-slash	User-agent: *\nDisallow: /a/b	Bot	/a%2Fb	allow	=	=	
-group-without-rules-still-applies	User-agent: *\nDisallow: /\n\nUser-agent: Bot\nDisallow:	Bot	/x	allow	defect	defect	defect: the Bot group is real and empty, so Bot may fetch everything; both fall back to the * group
-nonascii-pattern-raw-path	User-agent: *\nDisallow: /é	Bot	/é	disallow	defect	=	defect: WebFlux escapes the path but not the pattern, so the raw pattern never matches
-nonascii-pattern-escaped-path	User-agent: *\nDisallow: /é	Bot	/%C3%A9	disallow	defect	defect	defect: neither side escapes the pattern, so it never equals an escaped path
-escaped-pattern-plain-path	User-agent: *\nDisallow: /foo/%62%61%7A	Bot	/foo/baz	disallow	defect	defect	defect: an escaped unreserved character in the pattern is decoded before the comparison
-plain-pattern-escaped-path	User-agent: *\nDisallow: /foo/baz	Bot	/foo/%62%61%7A	disallow	=	defect	defect: an escaped unreserved character in the path is decoded before the comparison
-sitemap-line-between-agents-first	User-agent: A\nSitemap: https://example.com/s.xml\nUser-agent: B\nDisallow: /x	A	/x	disallow	=	defect	defect: a non-group line does not end the group (RFC 9309 2.2.1 leaves other records open); WebLookup split the group and left A with no rules
+group-without-rules-still-applies	User-agent: *\nDisallow: /\n\nUser-agent: Bot\nDisallow:	Bot	/x	allow	=	=	the Bot group is real and empty, so Bot may fetch everything; it is not sent to the * group
+sitemap-line-between-agents-first	User-agent: A\nSitemap: https://example.com/s.xml\nUser-agent: B\nDisallow: /x	A	/x	disallow	=	=	a Sitemap line between two User-agent lines does not end the group
+nonascii-pattern-raw-path	User-agent: *\nDisallow: /é	Bot	/é	disallow	=	=	a character outside ASCII is compared as its escaped UTF-8 octets
+nonascii-pattern-escaped-path	User-agent: *\nDisallow: /é	Bot	/%C3%A9	disallow	=	=	
+escaped-pattern-plain-path	User-agent: *\nDisallow: /foo/%62%61%7A	Bot	/foo/baz	disallow	=	=	an escaped unreserved character is decoded before the comparison
+plain-pattern-escaped-path	User-agent: *\nDisallow: /foo/baz	Bot	/foo/%62%61%7A	disallow	=	=	
+escape-hex-case	User-agent: *\nDisallow: /a%2fb	Bot	/a%2Fb	disallow	=	=	the hex digits of an escape are compared in one case
+escaped-tilde	User-agent: *\nDisallow: /%7Euser	Bot	/~user	disallow	=	=	
+escaped-star-is-not-a-wildcard	User-agent: *\nDisallow: /a%2Ab	Bot	/aXb	allow	=	=	an escaped reserved character stays an escape, so it is not the wildcard
 rules-before-any-group	Disallow: /x\nUser-agent: *\nDisallow: /y	Bot	/x	allow	=	disallow	choice: WebLookup applies rules that precede any User-agent line to every agent (the safe direction); WebFlux drops them as the RFC grammar gives them no group
 full-user-agent-string	User-agent: MyBot\nDisallow: /x	MyBot/1.0 (+https://example.com/bot)	/x	disallow	=	allow	choice: WebFlux takes the product token from a full User-Agent string; WebLookup compares what the caller passes, so the caller passes the token

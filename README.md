@@ -23,7 +23,7 @@ A lightweight .NET library for fast URL discovery across multiple search provide
 | Parallel search + URL deduplication | `WebSearchClient.SearchAsync` | `new WebSearchClient(providers...)`, or inject it after `AddWebLookup`; `WebSearchOptions.MaxResultsPerProvider` (10) per client or per call |
 | Fallback — a failing provider contributes no results, the others are still returned (the failure is not reported; if all fail the call throws) | `WebSearchClient` | Always on in `WebSearchClient` while at least one provider answers; a provider called directly throws |
 | Rate limit handling — retries HTTP 429 with exponential backoff, honours `Retry-After` | Built into each provider's own `HttpClient` | On when the provider creates its own `HttpClient`; off when you pass yours |
-| robots.txt (RFC 9309) | `SiteExplorer.GetRobotsAsync` → `RobotsInfo` (`Rules`, `Sitemaps`, `CrawlDelay`, `IsAllowed(path, userAgent)`) | `new SiteExplorer()`, or inject it after `AddWebLookup` |
+| robots.txt (RFC 9309) | `SiteExplorer.GetRobotsAsync` → `RobotsInfo` (`Rules`, `UserAgents`, `Sitemaps`, `CrawlDelay`, `IsAllowed(path, userAgent)`) | `new SiteExplorer()`, or inject it after `AddWebLookup` |
 | Sitemaps, including sitemap indexes and gzip | `SiteExplorer.GetSitemapAsync` / `StreamSitemapAsync` → `SitemapEntry` | Same `SiteExplorer` |
 | Dependency injection | `services.AddWebLookup(options => ...)` | Registers `WebSearchClient` (with the providers you add) and `SiteExplorer` as singletons |
 
@@ -177,6 +177,8 @@ How `SiteExplorer` treats what the server returns:
 - **robots.txt** — follows RFC 9309: a `4xx` status (`404`, `401`, `403`, …) means the file is unavailable and no
   rules apply (everything allowed). A `5xx` status, `429 Too Many Requests`, a connection failure and a client
   timeout mean the file is unreachable and everything is disallowed. Cancelling the call throws as usual.
+  `IsAllowed` compares patterns and paths percent-encoding normalised (`/foo/%62%61%7A` is `/foo/baz`), picks the most specific
+  rule, and treats an agent the file names with no rule (`UserAgents`) as allowed everywhere rather than falling back to `*`.
 - **Sitemaps** — a `<sitemapindex>` is followed into its child sitemaps (up to 10 levels deep); each distinct file
   is requested and read once per call, however many times an index lists it (a file that lists itself, or two indexes
   that list each other, end the walk instead of looping), and a call that would need more than 50,000 distinct sitemap

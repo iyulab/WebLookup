@@ -1,3 +1,5 @@
+using RobotsMatching;
+
 namespace WebLookup;
 
 /// <summary>
@@ -10,6 +12,11 @@ public record RobotsInfo
     /// </summary>
     public IReadOnlyList<RobotsRule> Rules { get; init; } = [];
     /// <summary>
+    /// The user agents the file names in <c>User-agent</c> lines, including those whose group holds no rule. A group with
+    /// no rule still applies to its agents (RFC 9309 section 2.2.1), so such an agent is not sent to the <c>*</c> group.
+    /// </summary>
+    public IReadOnlyList<string> UserAgents { get; init; } = [];
+    /// <summary>
     /// The sitemap addresses named by <c>Sitemap:</c> lines.
     /// </summary>
     public IReadOnlyList<string> Sitemaps { get; init; } = [];
@@ -20,7 +27,9 @@ public record RobotsInfo
 
     /// <summary>
     /// Whether <paramref name="userAgent"/> may fetch <paramref name="path"/>. A path is matched as the URL's path (and
-    /// query), which always starts with <c>/</c>: <c>private</c> is read as <c>/private</c>.
+    /// query), which always starts with <c>/</c>: <c>private</c> is read as <c>/private</c>. Percent-encoding is normalised
+    /// on both sides as RFC 9309 section 2.2.2 asks: <c>/foo/%62%61%7A</c> and <c>/foo/baz</c> are the same path, and a
+    /// non-ASCII path matches its escaped form.
     /// </summary>
     public bool IsAllowed(string path, string userAgent = "*")
     {
@@ -30,37 +39,26 @@ public record RobotsInfo
         if (path.Length == 0 || path[0] != '/')
             path = "/" + path;
 
-        var matchingRules = GetMatchingRules(userAgent);
+        path = RobotsPatternMatcher.Normalize(path);
 
-        if (matchingRules.Count == 0)
-            return true;
+        var bestAllow = -1;
+        var bestDisallow = -1;
 
-        RobotsRule? bestMatch = null;
-        var bestLength = -1;
-
-        foreach (var rule in matchingRules)
+        foreach (var rule in GetMatchingRules(userAgent))
         {
-            if (!PathMatches(path, rule.Path))
-                continue;
+            var specificity = RobotsPatternMatcher.Match(rule.Path, path);
 
-            var ruleLength = rule.Path.Length;
-
-            if (ruleLength > bestLength)
-            {
-                bestMatch = rule;
-                bestLength = ruleLength;
-            }
-            else if (ruleLength == bestLength && rule.Type == RobotsRuleType.Allow)
-            {
-                // RFC 9309: equal-length rules — Allow wins
-                bestMatch = rule;
-            }
+            if (rule.Type == RobotsRuleType.Allow)
+                bestAllow = Math.Max(bestAllow, specificity);
+            else
+                bestDisallow = Math.Max(bestDisallow, specificity);
         }
 
-        if (bestMatch is null)
+        if (bestDisallow < 0)
             return true;
 
-        return bestMatch.Type == RobotsRuleType.Allow;
+        // RFC 9309: of equal specificity, Allow wins.
+        return bestAllow >= bestDisallow;
     }
 
     private List<RobotsRule> GetMatchingRules(string userAgent)
@@ -69,58 +67,13 @@ public record RobotsInfo
             .Where(r => r.UserAgent.Equals(userAgent, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (specific.Count > 0)
+        // A group the file names is the group for that agent even when it holds no rule: only an agent the file never names
+        // falls back to the * group.
+        if (specific.Count > 0 || UserAgents.Any(name => name.Equals(userAgent, StringComparison.OrdinalIgnoreCase)))
             return specific;
 
         return Rules
             .Where(r => r.UserAgent == "*")
             .ToList();
-    }
-
-    private static bool PathMatches(string path, string pattern)
-    {
-        if (string.IsNullOrEmpty(pattern))
-            return true;
-
-        var mustMatchEnd = pattern.EndsWith('$');
-        var effectivePattern = mustMatchEnd ? pattern[..^1] : pattern;
-
-        if (effectivePattern.Contains('*'))
-        {
-            var parts = effectivePattern.Split('*');
-            var index = 0;
-
-            // First part must match at the start if non-empty
-            if (parts.Length > 0 && !string.IsNullOrEmpty(parts[0]))
-            {
-                if (!path.StartsWith(parts[0], StringComparison.Ordinal))
-                    return false;
-                index = parts[0].Length;
-            }
-
-            for (var i = 1; i < parts.Length; i++)
-            {
-                if (string.IsNullOrEmpty(parts[i]))
-                    continue;
-
-                // With a '$' the last piece must sit at the very end of the path. Taking its first occurrence instead
-                // would reject a path such as /a.php.php against /*.php$ - the '*' can cover "a.php" - and allow it.
-                if (mustMatchEnd && i == parts.Length - 1)
-                    return path.Length - parts[i].Length >= index && path.EndsWith(parts[i], StringComparison.Ordinal);
-
-                var found = path.IndexOf(parts[i], index, StringComparison.Ordinal);
-                if (found < 0)
-                    return false;
-                index = found + parts[i].Length;
-            }
-
-            // Reaching here with '$' means the pattern ends in '*' ("/x*$"), which covers whatever is left.
-            return true;
-        }
-
-        if (mustMatchEnd)
-            return path.Equals(effectivePattern, StringComparison.Ordinal);
-
-        return path.StartsWith(effectivePattern, StringComparison.Ordinal);
     }
 }

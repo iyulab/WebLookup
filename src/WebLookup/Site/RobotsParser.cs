@@ -8,6 +8,7 @@ internal static class RobotsParser
     {
         var rules = new List<RobotsRule>();
         var sitemaps = new List<string>();
+        var namedUserAgents = new List<string>();
         TimeSpan? crawlDelay = null;
         // RFC 9309 section 2.1: consecutive user-agent lines open one group, and its rules apply to every agent named.
         var currentUserAgents = new List<string> { "*" };
@@ -32,6 +33,13 @@ internal static class RobotsParser
             if (commentIndex >= 0)
                 value = value[..commentIndex].Trim();
 
+            // Only a rule line ends the start of a group. A Sitemap line, or a record this parser does not know, between two
+            // User-agent lines must not split the group (RFC 9309 section 2.2.1: parsing other records MUST NOT interfere).
+            if (directive.Equals("Allow", StringComparison.OrdinalIgnoreCase)
+                || directive.Equals("Disallow", StringComparison.OrdinalIgnoreCase)
+                || directive.Equals("Crawl-delay", StringComparison.OrdinalIgnoreCase))
+                previousWasUserAgent = false;
+
             if (string.IsNullOrEmpty(value) && !directive.Equals("Disallow", StringComparison.OrdinalIgnoreCase))
                 continue;
 
@@ -40,11 +48,10 @@ internal static class RobotsParser
                 if (!previousWasUserAgent)
                     currentUserAgents = [];
                 currentUserAgents.Add(value);
+                namedUserAgents.Add(value);
                 previousWasUserAgent = true;
                 continue;
             }
-
-            previousWasUserAgent = false;
 
             if (directive.Equals("Allow", StringComparison.OrdinalIgnoreCase))
             {
@@ -71,6 +78,7 @@ internal static class RobotsParser
         return new RobotsInfo
         {
             Rules = rules,
+            UserAgents = namedUserAgents,
             Sitemaps = sitemaps,
             CrawlDelay = crawlDelay
         };
