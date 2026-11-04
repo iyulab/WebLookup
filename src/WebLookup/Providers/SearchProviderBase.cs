@@ -3,13 +3,22 @@ using WebLookup.Http;
 
 namespace WebLookup;
 
+/// <summary>
+/// A base class for providers: it owns the HTTP client and offers small helpers for JSON APIs. Disposing the provider disposes a client it created, never one it was given.
+/// </summary>
 public abstract class SearchProviderBase : ISearchProvider, IDisposable
 {
     private HttpClient? _httpClient;
     private bool _ownsClient;
 
+    /// <summary>
+    /// The provider's name.
+    /// </summary>
     public abstract string Name { get; }
 
+    /// <summary>
+    /// The client every request goes through: the one given to <see cref="SetHttpClient"/>, or a default client created on first use.
+    /// </summary>
     protected HttpClient HttpClient
     {
         get
@@ -24,12 +33,25 @@ public abstract class SearchProviderBase : ISearchProvider, IDisposable
         }
     }
 
+    /// <summary>
+    /// Makes the provider use a caller's client, which it will not dispose.
+    /// </summary>
+    /// <param name="httpClient">The client to use.</param>
     protected void SetHttpClient(HttpClient httpClient)
     {
         _httpClient = httpClient;
         _ownsClient = false;
     }
 
+    /// <summary>
+    /// Searches for <paramref name="query"/>.
+    /// </summary>
+    /// <param name="query">The search text; must contain something other than white space.</param>
+    /// <param name="count">The most results to return, at least 1; a provider may return fewer.</param>
+    /// <param name="cancellationToken">Cancels the search.</param>
+    /// <returns>The results, best first.</returns>
+    /// <exception cref="ArgumentException"><paramref name="query"/> is null, empty or white space.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is less than 1.</exception>
     public abstract Task<IReadOnlyList<SearchResult>> SearchAsync(
         string query,
         int count = 10,
@@ -42,6 +64,14 @@ public abstract class SearchProviderBase : ISearchProvider, IDisposable
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
     }
 
+    /// <summary>
+    /// Sends a GET request and parses the JSON body.
+    /// </summary>
+    /// <param name="client">The client to send with.</param>
+    /// <param name="url">The request address.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The root element of the response.</returns>
+    /// <exception cref="HttpRequestException">The response status is not a success.</exception>
     protected static async Task<JsonElement> GetJsonAsync(
         HttpClient client,
         string url,
@@ -54,6 +84,15 @@ public abstract class SearchProviderBase : ISearchProvider, IDisposable
         return doc.RootElement.Clone();
     }
 
+    /// <summary>
+    /// Sends a POST request with a JSON body and parses the JSON response.
+    /// </summary>
+    /// <param name="client">The client to send with.</param>
+    /// <param name="url">The request address.</param>
+    /// <param name="body">The object serialized as the request body.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The root element of the response.</returns>
+    /// <exception cref="HttpRequestException">The response status is not a success.</exception>
     protected static async Task<JsonElement> PostJsonAsync(
         HttpClient client,
         string url,
@@ -69,6 +108,12 @@ public abstract class SearchProviderBase : ISearchProvider, IDisposable
         return doc.RootElement.Clone();
     }
 
+    /// <summary>
+    /// Reads a string property.
+    /// </summary>
+    /// <param name="element">The JSON object.</param>
+    /// <param name="propertyName">The property to read.</param>
+    /// <returns>The value, or <see langword="null"/> when the property is missing or not a string.</returns>
     protected static string? GetString(JsonElement element, string propertyName)
     {
         return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
@@ -76,6 +121,9 @@ public abstract class SearchProviderBase : ISearchProvider, IDisposable
             : null;
     }
 
+    /// <summary>
+    /// Disposes the HTTP client when this provider created it.
+    /// </summary>
     public void Dispose()
     {
         if (_ownsClient)

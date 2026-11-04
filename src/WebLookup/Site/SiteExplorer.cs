@@ -3,11 +3,17 @@ using WebLookup.Site;
 
 namespace WebLookup;
 
+/// <summary>
+/// Reads what a site publishes for crawlers: its robots.txt (RFC 9309) and its sitemaps, including sitemap indexes and gzip files.
+/// </summary>
 public sealed class SiteExplorer : IDisposable
 {
     private HttpClient? _httpClient;
     private bool _ownsClient;
 
+    /// <summary>
+    /// Creates an explorer with its own HTTP client, which sends <c>User-Agent: WebLookup/&lt;version&gt;</c> and is disposed with the explorer.
+    /// </summary>
     public SiteExplorer()
     {
     }
@@ -59,6 +65,13 @@ public sealed class SiteExplorer : IDisposable
         return _httpClient;
     }
 
+    /// <summary>
+    /// Reads the robots.txt at the root of a site.
+    /// </summary>
+    /// <param name="baseUri">Any address on the site; the file is read from <c>/robots.txt</c> of its host.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The parsed rules. A 4xx status (other than 429) means no robots.txt, so everything is allowed; a 5xx status, 429, a connection failure or a timeout means it is unreachable, so everything is disallowed.</returns>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public async Task<RobotsInfo> GetRobotsAsync(
         Uri baseUri,
         CancellationToken cancellationToken = default)
@@ -95,6 +108,14 @@ public sealed class SiteExplorer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Reads a sitemap, following a sitemap index into its child sitemaps (up to 10 levels). Each distinct file is requested once; a file that cannot be fetched or parsed, including one that times out, yields no entries.
+    /// </summary>
+    /// <param name="sitemapUri">The sitemap or sitemap index address.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    /// <returns>All entries, in document order.</returns>
+    /// <exception cref="InvalidDataException">The index names more than 50,000 distinct sitemap files.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public async Task<IReadOnlyList<SitemapEntry>> GetSitemapAsync(
         Uri sitemapUri,
         CancellationToken cancellationToken = default)
@@ -102,6 +123,14 @@ public sealed class SiteExplorer : IDisposable
         return await SitemapParser.ParseAsync(GetHttpClient(), sitemapUri, cancellationToken);
     }
 
+    /// <summary>
+    /// Reads a sitemap like <see cref="GetSitemapAsync"/> but yields each entry as its file is parsed, so the entries of an index are not all held in memory.
+    /// </summary>
+    /// <param name="sitemapUri">The sitemap or sitemap index address.</param>
+    /// <param name="cancellationToken">Cancels the enumeration.</param>
+    /// <returns>The entries, in document order.</returns>
+    /// <exception cref="InvalidDataException">The index names more than 50,000 distinct sitemap files; entries already yielded were delivered.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
     public IAsyncEnumerable<SitemapEntry> StreamSitemapAsync(
         Uri sitemapUri,
         CancellationToken cancellationToken = default)
@@ -109,6 +138,9 @@ public sealed class SiteExplorer : IDisposable
         return SitemapParser.StreamAsync(GetHttpClient(), sitemapUri, cancellationToken);
     }
 
+    /// <summary>
+    /// Disposes the HTTP client when the explorer created it.
+    /// </summary>
     public void Dispose()
     {
         if (_ownsClient)

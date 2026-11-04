@@ -1,9 +1,21 @@
 namespace WebLookup;
 
+/// <summary>
+/// What a site's robots.txt says (RFC 9309): the rules per user agent, the sitemaps it names, and its crawl delay.
+/// </summary>
 public record RobotsInfo
 {
+    /// <summary>
+    /// The Allow and Disallow rules, in file order, with the user-agent group each belongs to.
+    /// </summary>
     public IReadOnlyList<RobotsRule> Rules { get; init; } = [];
+    /// <summary>
+    /// The sitemap addresses named by <c>Sitemap:</c> lines.
+    /// </summary>
     public IReadOnlyList<string> Sitemaps { get; init; } = [];
+    /// <summary>
+    /// The last <c>Crawl-delay</c> line in the file, whichever group it sits in; <see langword="null"/> when there is none.
+    /// </summary>
     public TimeSpan? CrawlDelay { get; init; }
 
     /// <summary>

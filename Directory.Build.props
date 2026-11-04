@@ -16,11 +16,10 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
   <!-- Ship the XML documentation with the package: without this the nupkg
-       held only the dll and none of the /// docs reached a consumer. CS1591 is muted as elsewhere in the ecosystem;
-       the doc file is the goal, not a warning per member. -->
+       held only the dll and none of the /// docs reached a consumer. Every public type and member is documented, and
+       warnings are errors, so a public member added without /// (CS1591) fails the build. -->
   <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('\src\')) OR $(MSBuildProjectDirectory.Contains('/src/'))">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)../../local-packages')">
     <RestoreAdditionalProjectSources>

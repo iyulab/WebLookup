@@ -6,6 +6,9 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 
 ## [Unreleased]
 
+### Added
+- **Every public type and member is documented.** The `WebLookup.xml` file in the package carried no public-API documentation (only generated regex members), so an IDE showed nothing for `SiteExplorer`, `WebSearchClient`, `ISearchProvider` or `RobotsInfo`. All 24 public types and their members now have summaries (parameters, return values and the exceptions a call throws), and a public member added without `///` fails the build.
+
 ### Fixed
 - **`SiteExplorer` identifies itself.** The client it creates sent no `User-Agent` on robots.txt and sitemap requests; it now sends `WebLookup/<version>`. A client you pass to `new SiteExplorer(httpClient)` is used as it is, so that constructor is the way to send your own crawler's name (the README now says so).
 - **Sitemap dates and addresses read the same on every machine.** A `lastmod` without a UTC offset (`2026-11-04`) was read in the machine's time zone (`2026-11-04T00:00:00+09:00` on a Korean machine) and is now read as UTC; an explicit offset is kept. `<loc>` is trimmed, and an entry whose `<loc>` is empty, relative or not `http`/`https` is dropped instead of being returned with an unusable `Url`. **Breaking** by observation: a caller that relied on the machine's time zone for `LastModified`, or on an empty or relative `Url` appearing among the entries, sees different values. Migration: none for sitemaps that follow the protocol.
