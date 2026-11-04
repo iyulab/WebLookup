@@ -24,6 +24,8 @@ public sealed class SearchApiProvider : SearchProviderBase
         int count = 10,
         CancellationToken cancellationToken = default)
     {
+        ValidateSearchArguments(query, count);
+
         var engine = Uri.EscapeDataString(_options.Engine);
         var url = $"https://www.searchapi.io/api/v1/search?engine={engine}"
             + $"&q={Uri.EscapeDataString(query)}"

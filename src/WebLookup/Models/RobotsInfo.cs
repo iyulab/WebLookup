@@ -6,8 +6,18 @@ public record RobotsInfo
     public IReadOnlyList<string> Sitemaps { get; init; } = [];
     public TimeSpan? CrawlDelay { get; init; }
 
+    /// <summary>
+    /// Whether <paramref name="userAgent"/> may fetch <paramref name="path"/>. A path is matched as the URL's path (and
+    /// query), which always starts with <c>/</c>: <c>private</c> is read as <c>/private</c>.
+    /// </summary>
     public bool IsAllowed(string path, string userAgent = "*")
     {
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(userAgent);
+
+        if (path.Length == 0 || path[0] != '/')
+            path = "/" + path;
+
         var matchingRules = GetMatchingRules(userAgent);
 
         if (matchingRules.Count == 0)

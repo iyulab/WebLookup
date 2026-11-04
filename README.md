@@ -72,7 +72,8 @@ foreach (var item in results)
 
 Providers run in parallel and `SearchAsync` returns once every provider has answered or failed. A provider that throws
 contributes no results, so a rate-limited or misconfigured provider does not stop the others — and does not raise an
-error either: a short list can mean a provider failed. When **every** provider fails the call throws (the provider's own
+error either: a short list can mean a provider failed. A query that is empty or only white space, or a
+`MaxResultsPerProvider` / `count` below 1, throws (`ArgumentException`, `ArgumentOutOfRangeException`) before any provider is called. When **every** provider fails the call throws (the provider's own
 exception when there is one provider, an `AggregateException` of all of them otherwise), so a blocked or misconfigured
 search is not mistaken for a search with no hits. Disposing the client disposes its providers.
 
@@ -185,6 +186,13 @@ How `SiteExplorer` treats what the server returns:
   sitemap file is parsed; each file is still loaded in full, so streaming saves memory across the files of an index,
   not within one large file.
 - **Crawl-Delay** — `CrawlDelay` is the last `Crawl-delay` line in the file, whichever user-agent group it sits in.
+- **Who is asking** — `new SiteExplorer()` creates its own `HttpClient` and sends `User-Agent: WebLookup/<version>` on every
+  robots.txt and sitemap request. To identify your crawler, pass your own client: `new SiteExplorer(httpClient)` uses it as it
+  is (your `User-Agent`, timeout and handler; the explorer does not dispose it), and `IsAllowed(path, "MyBot")` then applies the
+  rules written for that name.
+- **Sitemap values** — an entry's `Url` is its `<loc>` with surrounding whitespace removed; a `<loc>` that is empty, relative
+  or not `http`/`https` is not an entry. `LastModified` reads a `lastmod` without a UTC offset (`2026-11-04`,
+  `2026-11-04T10:30:00`) as UTC, so it is the same on every machine; an explicit offset is kept.
 
 ### Filter URLs with robots.txt rules
 
@@ -197,7 +205,8 @@ bool allowed = robots.IsAllowed("/admin/page", userAgent: "MyBot");
 
 `IsAllowed` follows RFC 9309: the rules of the group naming your user agent apply (the `*` group only when no group
 names it), the longest matching path wins, and `Allow` wins a tie; `*` and `$` in paths are supported. The user agent is
-compared with the group's name as a whole token, ignoring case — pass `"MyBot"`, not `"MyBot/1.0"`.
+compared with the group's name as a whole token, ignoring case — pass `"MyBot"`, not `"MyBot/1.0"`. A path is the URL's path
+(and query), which starts with `/`: `private` is read as `/private`. A `null` path or user agent throws `ArgumentNullException`.
 
 ## Providers
 

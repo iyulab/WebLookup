@@ -31,6 +31,8 @@ public sealed class DuckDuckGoSearchProvider : SearchProviderBase
         int count = 10,
         CancellationToken cancellationToken = default)
     {
+        ValidateSearchArguments(query, count);
+
         var formFields = new List<KeyValuePair<string, string>>
         {
             new("q", query)

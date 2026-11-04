@@ -12,17 +12,48 @@ public sealed class SiteExplorer : IDisposable
     {
     }
 
+    /// <summary>Uses the caller's client as it is (its headers, timeout and handler); the explorer does not dispose it.</summary>
     public SiteExplorer(HttpClient httpClient)
     {
         _httpClient = httpClient;
         _ownsClient = false;
     }
 
+    internal SiteExplorer(HttpMessageHandler handler)
+    {
+        _httpClient = CreateClient(handler);
+        _ownsClient = true;
+    }
+
+    /// <summary>The <c>User-Agent</c> the explorer sends from the client it creates itself: <c>WebLookup/&lt;version&gt;</c>.</summary>
+    internal static string DefaultUserAgent { get; } = BuildUserAgent();
+
+    private static string BuildUserAgent()
+    {
+        var version = typeof(SiteExplorer).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), inherit: false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault()?.InformationalVersion;
+
+        // "0.3.0+<commit>" -> "0.3.0"
+        var plus = version?.IndexOf('+', StringComparison.Ordinal) ?? -1;
+        version = plus >= 0 ? version![..plus] : version;
+
+        return string.IsNullOrWhiteSpace(version) ? "WebLookup" : $"WebLookup/{version}";
+    }
+
+    private static HttpClient CreateClient(HttpMessageHandler? handler = null)
+    {
+        var client = handler is null ? new HttpClient() : new HttpClient(handler);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(DefaultUserAgent);
+        return client;
+    }
+
     private HttpClient GetHttpClient()
     {
         if (_httpClient is null)
         {
-            _httpClient = new HttpClient();
+            _httpClient = CreateClient();
             _ownsClient = true;
         }
         return _httpClient;

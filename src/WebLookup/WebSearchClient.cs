@@ -25,8 +25,10 @@ public sealed class WebSearchClient : IDisposable
         WebSearchOptions? options,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
         options ??= Options;
         var count = options.MaxResultsPerProvider;
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1, nameof(options));
 
         var tasks = _providers.Select(provider =>
             SafeSearchAsync(provider, query, count, cancellationToken));

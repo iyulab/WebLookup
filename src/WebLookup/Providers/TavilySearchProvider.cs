@@ -24,6 +24,8 @@ public sealed class TavilySearchProvider : SearchProviderBase
         int count = 10,
         CancellationToken cancellationToken = default)
     {
+        ValidateSearchArguments(query, count);
+
         var body = new
         {
             api_key = _options.ApiKey,

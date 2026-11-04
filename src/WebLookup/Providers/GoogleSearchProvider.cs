@@ -24,6 +24,8 @@ public sealed class GoogleSearchProvider : SearchProviderBase
         int count = 10,
         CancellationToken cancellationToken = default)
     {
+        ValidateSearchArguments(query, count);
+
         var num = Math.Min(count, 10);
         var encodedQuery = Uri.EscapeDataString(query);
 

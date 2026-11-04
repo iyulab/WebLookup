@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
@@ -113,8 +114,8 @@ internal static class SitemapParser
         {
             var childSitemapUrls = root
                 .Elements(ns + "sitemap")
-                .Select(e => e.Element(ns + "loc")?.Value)
-                .Where(url => url is not null);
+                .Select(e => e.Element(ns + "loc")?.Value.Trim())
+                .Where(url => !string.IsNullOrEmpty(url));
 
             foreach (var childUrl in childSitemapUrls)
             {
@@ -131,13 +132,13 @@ internal static class SitemapParser
         {
             foreach (var urlElement in root.Elements(ns + "url"))
             {
-                var loc = urlElement.Element(ns + "loc")?.Value;
-                if (loc is null)
+                var loc = urlElement.Element(ns + "loc")?.Value.Trim();
+                if (!IsAbsoluteWebAddress(loc))
                     continue;
 
                 DateTimeOffset? lastMod = null;
                 var lastModStr = urlElement.Element(ns + "lastmod")?.Value;
-                if (lastModStr is not null && DateTimeOffset.TryParse(lastModStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+                if (lastModStr is not null && DateTimeOffset.TryParse(lastModStr, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
                     lastMod = parsed;
 
                 double? priority = null;
@@ -155,6 +156,11 @@ internal static class SitemapParser
             }
         }
     }
+
+    // A sitemap lists absolute http(s) addresses (the protocol requires a fully qualified, entity-escaped URL); an empty or
+    // relative <loc> is not one a caller can fetch, so it is not an entry.
+    private static bool IsAbsoluteWebAddress([NotNullWhen(true)] string? loc) =>
+        Uri.TryCreate(loc, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
     private static async Task<XDocument> FetchXmlAsync(
         HttpClient httpClient,

@@ -8,6 +8,9 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         Action<WebLookupBuilder> configure)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
         var builder = new WebLookupBuilder(services);
         configure(builder);
         builder.Build();
@@ -59,6 +62,8 @@ public sealed class WebLookupBuilder
 
     public WebLookupBuilder AddGoogle(Action<GoogleSearchBuilder> configure)
     {
+        ArgumentNullException.ThrowIfNull(configure);
+
         var google = new GoogleSearchBuilder();
         configure(google);
         var options = google.Build();

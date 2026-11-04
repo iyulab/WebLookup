@@ -24,6 +24,8 @@ public sealed class MojeekSearchProvider : SearchProviderBase
         int count = 10,
         CancellationToken cancellationToken = default)
     {
+        ValidateSearchArguments(query, count);
+
         var url = $"https://www.mojeek.com/search?api_key={Uri.EscapeDataString(_options.ApiKey)}"
             + $"&q={Uri.EscapeDataString(query)}"
             + $"&t={count}"

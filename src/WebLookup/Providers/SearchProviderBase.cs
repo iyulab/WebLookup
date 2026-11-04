@@ -35,6 +35,13 @@ public abstract class SearchProviderBase : ISearchProvider, IDisposable
         int count = 10,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Checks the arguments every provider's <c>SearchAsync</c> takes: a query with text, and a count of at least 1.</summary>
+    protected static void ValidateSearchArguments(string query, int count)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+    }
+
     protected static async Task<JsonElement> GetJsonAsync(
         HttpClient client,
         string url,
