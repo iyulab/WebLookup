@@ -30,4 +30,9 @@
     <ProjectReference Include="..\..\src\WebLookup\WebLookup.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The robots.txt questions shared byte for byte with the other library that reads robots.txt. -->
+    <None Update="Site\robots-corpus.tsv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
