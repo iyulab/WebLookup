@@ -258,4 +258,28 @@ public class RobotsParserTests
         Assert.False(info.IsAllowed("/secret", userAgent: "mybot"));
         Assert.False(info.IsAllowed("/secret", userAgent: "MYBOT"));
     }
+
+    // RFC 9309 section 2.2.3: '*' matches any run of characters (including none) and a trailing '$' anchors the end. A
+    // wildcard followed by a suffix and '$' must find the suffix at the end of the path, not at its first occurrence.
+    [Theory]
+    [InlineData("/*.php$", "/a.php", true)]
+    [InlineData("/*.php$", "/a.php.php", true)]
+    [InlineData("/*.php$", "/x.php.bak", false)]
+    [InlineData("/*.php$", "/.php", true)]
+    [InlineData("/*a*b$", "/xaxb", true)]
+    [InlineData("/*a*b$", "/xabab", true)]
+    [InlineData("/*a*b$", "/xabx", false)]
+    [InlineData("/x*$", "/xyz", true)]
+    [InlineData("/*$", "/anything", true)]
+    [InlineData("/exact$", "/exact", true)]
+    [InlineData("/exact$", "/exactly", false)]
+    [InlineData("/tmp/*/x", "/tmp/q/x", true)]
+    [InlineData("/tmp/*/x", "/tmp/x", false)]
+    public void IsAllowed_AppliesWildcardAndEndAnchorPerRfc9309(string pattern, string path, bool matched)
+    {
+        var robots = RobotsParser.Parse($"User-agent: *\nDisallow: {pattern}\n");
+
+        Assert.Equal(!matched, robots.IsAllowed(path));
+    }
+
 }

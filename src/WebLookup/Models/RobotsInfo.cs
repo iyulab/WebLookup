@@ -103,15 +103,18 @@ public record RobotsInfo
                 if (string.IsNullOrEmpty(parts[i]))
                     continue;
 
+                // With a '$' the last piece must sit at the very end of the path. Taking its first occurrence instead
+                // would reject a path such as /a.php.php against /*.php$ - the '*' can cover "a.php" - and allow it.
+                if (mustMatchEnd && i == parts.Length - 1)
+                    return path.Length - parts[i].Length >= index && path.EndsWith(parts[i], StringComparison.Ordinal);
+
                 var found = path.IndexOf(parts[i], index, StringComparison.Ordinal);
                 if (found < 0)
                     return false;
                 index = found + parts[i].Length;
             }
 
-            if (mustMatchEnd)
-                return index == path.Length;
-
+            // Reaching here with '$' means the pattern ends in '*' ("/x*$"), which covers whatever is left.
             return true;
         }
 
