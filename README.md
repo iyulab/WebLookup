@@ -171,7 +171,10 @@ How `SiteExplorer` treats what the server returns:
 - **robots.txt** — follows RFC 9309: a `4xx` status (`404`, `401`, `403`, …) means the file is unavailable and no
   rules apply (everything allowed). A `5xx` status, `429 Too Many Requests`, a connection failure and a client
   timeout mean the file is unreachable and everything is disallowed. Cancelling the call throws as usual.
-- **Sitemaps** — a `<sitemapindex>` is followed into its child sitemaps (up to 10 levels deep); `.gz` files and
+- **Sitemaps** — a `<sitemapindex>` is followed into its child sitemaps (up to 10 levels deep); each distinct file
+  is requested and read once per call, however many times an index lists it (a file that lists itself, or two indexes
+  that list each other, end the walk instead of looping), and a call that would need more than 50,000 distinct sitemap
+  files (the protocol's limit for one index) throws `InvalidDataException` instead of continuing; `.gz` files and
   `Content-Encoding: gzip` responses are decompressed. A sitemap that cannot be fetched or parsed yields no entries
   instead of throwing, so an empty result can mean the fetch failed. `StreamSitemapAsync` yields entries as each
   sitemap file is parsed; each file is still loaded in full, so streaming saves memory across the files of an index,

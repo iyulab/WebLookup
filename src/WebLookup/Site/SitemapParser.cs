@@ -9,6 +9,11 @@ internal static class SitemapParser
 {
     private const int MaxRecursionDepth = 10;
 
+    // The sitemaps.org protocol lets one index list at most 50,000 sitemaps. A walk that has to fetch more than that
+    // many files is not following an index within the protocol, and one call must not turn a hostile or broken index
+    // into an unbounded stream of requests to whatever it names.
+    internal const int MaxSitemapFiles = 50_000;
+
     public static async Task<IReadOnlyList<SitemapEntry>> ParseAsync(
         HttpClient httpClient,
         Uri sitemapUri,
@@ -29,16 +34,56 @@ internal static class SitemapParser
         Uri sitemapUri,
         CancellationToken cancellationToken)
     {
-        return StreamCoreAsync(httpClient, sitemapUri, depth: 0, cancellationToken);
+        return StreamAsync(httpClient, sitemapUri, MaxSitemapFiles, cancellationToken);
+    }
+
+    internal static IAsyncEnumerable<SitemapEntry> StreamAsync(
+        HttpClient httpClient,
+        Uri sitemapUri,
+        int maxSitemapFiles,
+        CancellationToken cancellationToken)
+    {
+        return StreamCoreAsync(httpClient, sitemapUri, depth: 0, new Walk(maxSitemapFiles), cancellationToken);
+    }
+
+    /// <summary>The state of one call: which sitemap files were already requested, and how many.</summary>
+    private sealed class Walk(int maxSitemapFiles)
+    {
+        private readonly HashSet<string> _requested = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Records <paramref name="uri"/> as requested; false when it already was. A file listed twice, or an index that
+        /// lists itself or an ancestor, is requested once and yields its entries once.
+        /// </summary>
+        public bool TryRequest(Uri uri)
+        {
+            // Uri has already lower-cased the scheme and host; the fragment names a place inside the document, not another one.
+            if (!_requested.Add(uri.GetComponents(UriComponents.AbsoluteUri & ~UriComponents.Fragment, UriFormat.UriEscaped)))
+            {
+                return false;
+            }
+
+            if (_requested.Count > maxSitemapFiles)
+            {
+                throw new InvalidDataException(
+                    $"The sitemap index names more than {maxSitemapFiles} distinct sitemap files (the sitemaps.org limit for one index); the walk was stopped.");
+            }
+
+            return true;
+        }
     }
 
     private static async IAsyncEnumerable<SitemapEntry> StreamCoreAsync(
         HttpClient httpClient,
         Uri sitemapUri,
         int depth,
+        Walk walk,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         if (depth > MaxRecursionDepth)
+            yield break;
+
+        if (!walk.TryRequest(sitemapUri))
             yield break;
 
         XDocument doc;
@@ -74,7 +119,7 @@ internal static class SitemapParser
                 if (!Uri.TryCreate(childUrl, UriKind.Absolute, out var childUri))
                     continue;
 
-                await foreach (var entry in StreamCoreAsync(httpClient, childUri, depth + 1, cancellationToken))
+                await foreach (var entry in StreamCoreAsync(httpClient, childUri, depth + 1, walk, cancellationToken))
                 {
                     yield return entry;
                 }

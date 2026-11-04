@@ -7,6 +7,8 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 ## [Unreleased]
 
 ### Fixed
+- **A sitemap index is followed once per distinct file.** `GetSitemapAsync` / `StreamSitemapAsync` only had a depth limit, so an index that listed itself twice cost 2,047 requests (2^11 - 1) and returned nothing, two indexes listing each other were fetched five or six times each, and a child listed twice yielded its entries twice. A sitemap file is now requested and read once per call (the address compared without its fragment, with the scheme and host in lower case), so the number of requests is bounded by the number of distinct files the input names, not by its shape.
+- **A call stops at 50,000 distinct sitemap files** (the sitemaps.org limit for one index) by throwing `InvalidDataException`, rather than carrying on requesting whatever a broken or hostile index names. **Breaking** by observation only for an index that names more than the protocol allows: it used to be fetched without bound, and now the call throws (entries streamed before that point were already delivered). Migration: none for an index within the protocol.
 - **The package links to the repository as its project site** (`PackageProjectUrl`) — its nuget.org page had no project link.
 
 ### Changed

@@ -259,4 +259,157 @@ public class SitemapParserTests
 
         Assert.Empty(results);
     }
+
+    // A sitemap index is followed once per distinct file: before, only a depth limit stopped a walk, so an index that
+    // listed itself twice cost 2,047 requests (2^11 - 1) for no entries, and a child listed twice yielded its entries twice.
+    private static string Index(params string[] children) =>
+        "<?xml version=\"1.0\"?><sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"
+        + string.Concat(children.Select(c => $"<sitemap><loc>{c}</loc></sitemap>")) + "</sitemapindex>";
+
+    private static string UrlSet(params string[] pages) =>
+        "<?xml version=\"1.0\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"
+        + string.Concat(pages.Select(p => $"<url><loc>{p}</loc></url>")) + "</urlset>";
+
+    private static (HttpClient Client, List<string> Requests) Site(Dictionary<string, string> files)
+    {
+        var requests = new List<string>();
+        var handler = new MockHttpHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            requests.Add(path);
+            return Task.FromResult(files.TryGetValue(path, out var xml)
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(xml, Encoding.UTF8, "application/xml") }
+                : new HttpResponseMessage(HttpStatusCode.NotFound));
+        });
+        return (new HttpClient(handler), requests);
+    }
+
+    [Fact]
+    public async Task Parse_IndexListingItselfTwice_RequestsEachFileOnce()
+    {
+        var self = "https://example.com/self.xml";
+        var (client, requests) = Site(new() { ["/self.xml"] = Index(self, self) });
+
+        var results = await SitemapParser.ParseAsync(client, new Uri(self), CancellationToken.None);
+
+        Assert.Empty(results);
+        Assert.Equal(["/self.xml"], requests);
+    }
+
+    [Fact]
+    public async Task Parse_IndexListingItselfOnce_RequestsOnce()
+    {
+        var self = "https://example.com/self.xml";
+        var (client, requests) = Site(new() { ["/self.xml"] = Index(self) });
+
+        await SitemapParser.ParseAsync(client, new Uri(self), CancellationToken.None);
+
+        Assert.Single(requests);
+    }
+
+    [Fact]
+    public async Task Parse_CyclicIndexes_RequestEachFileOnce_AndYieldTheLeafOnce()
+    {
+        var (client, requests) = Site(new()
+        {
+            ["/a.xml"] = Index("https://example.com/b.xml", "https://example.com/leaf.xml"),
+            ["/b.xml"] = Index("https://example.com/a.xml", "https://example.com/leaf.xml"),
+            ["/leaf.xml"] = UrlSet("https://example.com/p1", "https://example.com/p2")
+        });
+
+        var results = await SitemapParser.ParseAsync(client, new Uri("https://example.com/a.xml"), CancellationToken.None);
+
+        Assert.Equal(["https://example.com/p1", "https://example.com/p2"], results.Select(e => e.Url));
+        Assert.Equal(["/a.xml", "/b.xml", "/leaf.xml"], requests.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task Parse_ChildListedTwice_YieldsItsEntriesOnce()
+    {
+        var child = "https://example.com/child.xml";
+        var (client, requests) = Site(new()
+        {
+            ["/index.xml"] = Index(child, child),
+            ["/child.xml"] = UrlSet("https://example.com/p1", "https://example.com/p2", "https://example.com/p3")
+        });
+
+        var results = await SitemapParser.ParseAsync(client, new Uri("https://example.com/index.xml"), CancellationToken.None);
+
+        Assert.Equal(3, results.Count);
+        Assert.Equal(["/index.xml", "/child.xml"], requests);
+    }
+
+    [Fact]
+    public async Task Parse_SameFileSpelledWithAFragmentOrUpperCaseHost_IsTheSameFile()
+    {
+        var (client, requests) = Site(new()
+        {
+            ["/index.xml"] = Index("https://example.com/c.xml", "HTTPS://EXAMPLE.COM/c.xml#again", "https://example.com/c.xml#other"),
+            ["/c.xml"] = UrlSet("https://example.com/p1")
+        });
+
+        var results = await SitemapParser.ParseAsync(client, new Uri("https://example.com/index.xml"), CancellationToken.None);
+
+        Assert.Single(results);
+        Assert.Equal(2, requests.Count);
+    }
+
+    [Fact]
+    public async Task Parse_FilesWithDifferentQueryStrings_AreDifferentFiles()
+    {
+        var (client, requests) = Site(new()
+        {
+            ["/index.xml"] = Index("https://example.com/c.xml?page=1", "https://example.com/c.xml?page=2"),
+            ["/c.xml"] = UrlSet("https://example.com/p1")
+        });
+
+        var results = await SitemapParser.ParseAsync(client, new Uri("https://example.com/index.xml"), CancellationToken.None);
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal(3, requests.Count);
+    }
+
+    [Fact]
+    public async Task Stream_AnIndexNamingMoreDistinctFilesThanTheLimit_StopsAndSaysSo()
+    {
+        var children = Enumerable.Range(1, 6).Select(i => $"https://example.com/c{i}.xml").ToArray();
+        var files = new Dictionary<string, string> { ["/index.xml"] = Index(children) };
+        foreach (var i in Enumerable.Range(1, 6))
+        {
+            files[$"/c{i}.xml"] = UrlSet($"https://example.com/p{i}");
+        }
+        var (client, requests) = Site(files);
+
+        // The index plus five children fit in a limit of 6 files; the sixth child does not.
+        var ex = await Assert.ThrowsAsync<InvalidDataException>(async () =>
+        {
+            await foreach (var _ in SitemapParser.StreamAsync(client, new Uri("https://example.com/index.xml"), 6, CancellationToken.None))
+            {
+            }
+        });
+
+        Assert.Contains("more than 6", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(6, requests.Count);
+    }
+
+    [Fact]
+    public async Task Stream_AnIndexWithinTheLimit_IsNotStopped()
+    {
+        var children = Enumerable.Range(1, 5).Select(i => $"https://example.com/c{i}.xml").ToArray();
+        var files = new Dictionary<string, string> { ["/index.xml"] = Index(children) };
+        foreach (var i in Enumerable.Range(1, 5))
+        {
+            files[$"/c{i}.xml"] = UrlSet($"https://example.com/p{i}");
+        }
+        var (client, _) = Site(files);
+
+        var entries = new List<SitemapEntry>();
+        await foreach (var e in SitemapParser.StreamAsync(client, new Uri("https://example.com/index.xml"), 6, CancellationToken.None))
+        {
+            entries.Add(e);
+        }
+
+        Assert.Equal(5, entries.Count);
+    }
+
 }
