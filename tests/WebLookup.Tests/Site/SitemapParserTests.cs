@@ -412,4 +412,70 @@ public class SitemapParserTests
         Assert.Equal(5, entries.Count);
     }
 
+    // A client timeout is one way a sitemap "cannot be fetched" (the README says such a file yields no entries): the
+    // siblings' entries survive. Only the caller's own cancellation propagates, as it does everywhere else in this tree.
+    private static HttpClient ClientWhere(string slowPath, Dictionary<string, string> files) =>
+        new(new MockHttpHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == slowPath)
+            {
+                // What HttpClient.Timeout throws: a TaskCanceledException whose inner exception is a TimeoutException,
+                // while the caller's token is not cancelled.
+                throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout.", new TimeoutException());
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(files[path], Encoding.UTF8, "application/xml")
+            });
+        }));
+
+    [Fact]
+    public async Task Parse_ChildThatTimesOut_IsSkipped_AndItsSiblingsEntriesSurvive()
+    {
+        var client = ClientWhere("/slow.xml", new()
+        {
+            ["/index.xml"] = Index("https://example.com/fast.xml", "https://example.com/slow.xml", "https://example.com/fast2.xml"),
+            ["/fast.xml"] = UrlSet("https://example.com/p1", "https://example.com/p2"),
+            ["/fast2.xml"] = UrlSet("https://example.com/p3")
+        });
+
+        var results = await SitemapParser.ParseAsync(client, new Uri("https://example.com/index.xml"), CancellationToken.None);
+
+        Assert.Equal(["https://example.com/p1", "https://example.com/p2", "https://example.com/p3"], results.Select(e => e.Url));
+    }
+
+    [Fact]
+    public async Task Parse_RootThatTimesOut_YieldsNoEntriesInsteadOfThrowing()
+    {
+        var client = ClientWhere("/index.xml", []);
+
+        var results = await SitemapParser.ParseAsync(client, new Uri("https://example.com/index.xml"), CancellationToken.None);
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public async Task Parse_CallerCancellationDuringAChild_StillPropagates()
+    {
+        using var cts = new CancellationTokenSource();
+        var handler = new MockHttpHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath == "/child.xml")
+            {
+                cts.Cancel();
+                throw new TaskCanceledException("canceled by the caller", null, cts.Token);
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(Index("https://example.com/child.xml"), Encoding.UTF8, "application/xml")
+            });
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => SitemapParser.ParseAsync(new HttpClient(handler), new Uri("https://example.com/index.xml"), cts.Token));
+    }
+
 }

@@ -91,8 +91,10 @@ internal static class SitemapParser
         {
             doc = await FetchXmlAsync(httpClient, sitemapUri, cancellationToken);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            // The caller's own cancellation propagates. An HttpClient timeout is also an OperationCanceledException, but the
+            // caller's token is not cancelled then: the file "cannot be fetched" and is skipped like any other that fails.
             throw;
         }
         catch
