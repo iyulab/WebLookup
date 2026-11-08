@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
-## [Unreleased]
+## [0.4.0] - 2026-11-09
 
 ### Added
 - **Every public type and member is documented.** The `WebLookup.xml` file in the package carried no public-API documentation (only generated regex members), so an IDE showed nothing for `SiteExplorer`, `WebSearchClient`, `ISearchProvider` or `RobotsInfo`. All 24 public types and their members now have summaries (parameters, return values and the exceptions a call throws), and a public member added without `///` fails the build.
